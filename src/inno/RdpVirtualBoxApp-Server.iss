@@ -142,14 +142,16 @@ end;
 
 // Make sure elevated install dir is honoured even if user accepts the dialog
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  InstalledVersion, InstalledDate: String;
 begin
   if CurStep = ssPostInstall then
   begin
     // Touch a marker file so the wizard knows install completed cleanly
+    InstalledVersion := ExpandConstant('{#MyAppVersion}');
+    InstalledDate    := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
     SaveStringToFile(ExpandConstant('{commonappdata}\RdpVirtualBoxApp\installed.marker'),
-                     Format('RdpVirtualBoxApp Server v%s installed on %s',
-                            [ExpandConstant('{#MyAppVersion}'),
-                             FormatDateTime('yyyy-mm-dd hh:nn:ss', Now)]),
+                     'RdpVirtualBoxApp Server v' + InstalledVersion + ' installed on ' + InstalledDate,
                      False);
   end;
 end;
