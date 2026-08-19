@@ -204,6 +204,14 @@ jobs:
           mkdir -p output
           chmod 777 build build/output output 2>/dev/null || true
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
+          # Debug: Server.iss icindeki [Tasks] section'i goster
+          echo "=== Server.iss [Tasks] section ==="
+          grep -A 3 "\[Tasks\]" src/inno/RdpVirtualBoxApp-Server.iss
+          # Docker icindeki dosyayi da goster (mount test)
+          echo "=== Docker icindeki Server.iss 65-72. satirlar ==="
+          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
+            sed -n '65,72p' /work/src/inno/RdpVirtualBoxApp-Server.iss > /tmp/server-tasks.txt 2>&1 || true
+          cat /tmp/server-tasks.txt
           if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
@@ -278,3 +286,61 @@ jobs:
             build/**/*.iss
           if-no-files-found: ignore
           retention-days: 7
+
+  # =============================================================
+  # macOS Native Client (SwiftUI) - swift build + DMG
+  # =============================================================
+  build-macos:
+    name: Build macOS Native Client (SwiftUI + DMG)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    needs: build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Swift toolchain
+        run: |
+          swift --version
+          xcodebuild -version || true
+
+      - name: Resolve Swift package dependencies
+        run: |
+          swift package --package-path src/swift/RdpVirtualBoxApp resolve
+
+      - name: Run Swift tests
+        run: |
+          swift test --package-path src/swift/RdpVirtualBoxApp \
+            --parallel \
+            --enable-code-coverage
+
+      - name: Build .app bundle and DMG
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          # github.ref_name icin 'v' prefix'ini temizle
+          CLEAN_VERSION="${VERSION#v}"
+          bash src/swift/RdpVirtualBoxApp/build/make-dmg.sh \
+            --version "$CLEAN_VERSION" \
+            --output build/output
+
+      - name: Generate SHA256SUMS (macOS DMG)
+        shell: bash
+        run: |
+          cd build/output
+          (for f in *.dmg; do
+             [ -f "$f" ] || continue
+             sha256sum "$f"
+           done) > SHA256SUMS-macOS.txt || true
+          cat SHA256SUMS-macOS.txt 2>/dev/null || echo "(no dmg files)"
+
+      - name: Upload macOS DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-virtual-box-app-macos
+          path: |
+            build/output/RdpVirtualBoxApp-Client-macOS-*.dmg
+            build/output/SHA256SUMS-macOS.txt
+          if-no-files-found: warn
+          retention-days: 30
