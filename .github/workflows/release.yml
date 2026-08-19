@@ -53,10 +53,13 @@ jobs:
           mkdir -p build/output
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
           chmod 777 build build/output
+          # Client.iss'i repo root'a kopyala
+          cp src/inno/RdpVirtualBoxApp-Client.iss build/RdpVirtualBoxApp-Client.iss
+          chmod 777 build/RdpVirtualBoxApp-Client.iss
           if ! docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Client.iss 2>&1 | tail -20; then
+               build/RdpVirtualBoxApp-Client.iss 2>&1 | tail -20; then
             echo "Original Client.iss FAILED, fallback kullaniliyor: .github/fallback-iss/client.iss"
             cp .github/fallback-iss/client.iss build/client.iss
             chmod 777 build/client.iss
@@ -74,10 +77,13 @@ jobs:
           set -e
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
           chmod 777 build build/output
+          # Server.iss'i repo root'a kopyala
+          cp src/inno/RdpVirtualBoxApp-Server.iss build/RdpVirtualBoxApp-Server.iss
+          chmod 777 build/RdpVirtualBoxApp-Server.iss
           if ! docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Server.iss 2>&1 | tail -20; then
+               build/RdpVirtualBoxApp-Server.iss 2>&1 | tail -20; then
             echo "Original Server.iss FAILED, fallback kullaniliyor: .github/fallback-iss/server.iss"
             cp .github/fallback-iss/server.iss build/server.iss
             chmod 777 build/server.iss

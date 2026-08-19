@@ -155,18 +155,15 @@ jobs:
           chmod 777 build build/output output 2>/dev/null || true
           # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
+          # Client.iss'i repo root'a kopyala ki relative path'ler (powershell\client\* vs)
+          # /work altinda direkt gorulebilsin
+          cp src/inno/RdpVirtualBoxApp-Client.iss build/RdpVirtualBoxApp-Client.iss
+          chmod 777 build/RdpVirtualBoxApp-Client.iss
           # Önce orijinal Client.iss'i dene (root olarak ki tum dosyalari okuyabilsin)
-          # Debug: .iss dosyasinin ve mount'un saglikli oldugunu goster
-          echo "=== Client.iss ilk 20 satir ==="
-          head -20 src/inno/RdpVirtualBoxApp-Client.iss
-          echo "=== /work mount test ==="
-          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
-            ls /work/src/inno/ /work/src/powershell/client/ /work/src/assets/ /work/src/config/client/ > /tmp/mount-test.txt 2>&1 || true
-          cat /tmp/mount-test.txt
           if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Client.iss \
+               build/RdpVirtualBoxApp-Client.iss \
                > iscc_client.log 2>&1; then
             echo "Original Client.iss derlendi."
             echo "Original Client.iss derlendi."
@@ -211,10 +208,13 @@ jobs:
           mkdir -p output
           chmod 777 build build/output output 2>/dev/null || true
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
+          # Server.iss'i repo root'a kopyala ki relative path'ler direkt gorulebilsin
+          cp src/inno/RdpVirtualBoxApp-Server.iss build/RdpVirtualBoxApp-Server.iss
+          chmod 777 build/RdpVirtualBoxApp-Server.iss
           if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Server.iss \
+               build/RdpVirtualBoxApp-Server.iss \
                > iscc_server.log 2>&1; then
             echo "Original Server.iss derlendi."
             if [ -d "output" ]; then
