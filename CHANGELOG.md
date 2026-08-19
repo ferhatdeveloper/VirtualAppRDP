@@ -174,6 +174,47 @@ Gelecek sürümler için planlama aşamasında.
 - Webhook tabanlı olay bildirimleri
 - Çoklu dil desteği (TR / EN / DE)
 
+### v1.0.0 post-release code health pass (2026-08-19)
+
+`fix(inno): fix parse errors (AppId braces, Format bracket) and remove dangerous registry uninstall entries` (2f97ef5)
+- `src/inno/RdpVirtualBoxApp-Server.iss`: `AppId={8B6A8C2D-…}` → `AppId=8B6A8C2D-…`
+  (süslü parantezler literal karakter değil, ISCC parser tarafından
+  expression olarak yorumlanıyor ve parse hatasına neden oluyordu).
+- `src/inno/RdpVirtualBoxApp-Server.iss`: Pascal `Format()` çağrısında
+  `ExpandConstant('{#MyAppVersion}']` fazladan `]` nedeniyle bracket mismatch.
+- `src/inno/RdpVirtualBoxApp-Server.iss`: `SetupIconFile` ve `[Files]` Source
+  path'leri `src\inno\..\assets\…` → `src\assets\…` (repo root'a göre
+  göreli). `OutputDir` da `build\output` olarak normalize edildi.
+- `src/inno/RdpVirtualBoxApp-Client.iss`: `[UninstallDelete]` bölümünden
+  `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap`
+  anahtarını silen satır kaldırıldı (kullanıcının Internet Explorer zone
+  ayarlarını sıfırlıyordu). `__RDPVB_DELETE__` placeholder regkey de kaldırıldı.
+
+`fix(powershell): fix real parse errors found by local pwsh parser` (fde34b8)
+- `src/powershell/server/ServerSetupUI.ps1`: `.Add_CheckedChanged({…})` /
+  `.Add_Click({…})` çağrıları parser reddettiği için kaldırıldı. Step-2
+  checkbox/radio state'leri artık bir `Update-WizardDataFromStep2` yardımcı
+  fonksiyonu ile Next handler'ında senkron okunuyor. License tespit
+  butonu `.add_Click({ Invoke-LicenseDetectionButton })` ile çalışıyor.
+- `src/powershell/server/AppScanner.ps1`: `$files.ForEach { $_ }` →
+  `$files.ForEach({ $_ })` (parser strict modda tek argümanlı çağrı istiyor).
+- `src/powershell/client/ServerProbe.ps1`: `$ComputerName:$Port` string
+  interpolation'ı `${ComputerName}:${Port}` olarak escape edildi.
+- Doğrulama: `pwsh` + `[System.Management.Automation.Language.Parser]` ile
+  tüm 20 ps1 dosyası hatasız parse oluyor.
+
+`fix(ci): disable cancel-in-progress on build workflow` (3845fba)
+- `cancel-in-progress: true` her push'ta önceki run'ı iptal ediyordu;
+  tüm run'lar 'Failure' (cancelled) görünüyordu ve gerçek build sonucunu
+  göremiyorduk. Şimdi her run tamamlanıyor.
+
+`ci(diagnose): auto-run on push/PR; always upload ISCC logs as artifact` (fc5eeee)
+- `diagnose-iss.yml` artık workflow_dispatch yanında push + PR ile de
+  tetikleniyor.
+- `build.yml`'e `if: always()` ile ISCC + analyzer log'larını yükleyen
+  bir `iscc-logs` artifact adımı eklendi (her zaman yüklenir, hata
+  olsa bile).
+
 ---
 
 [1.0.0]: https://github.com/ferhatdeveloper/VirtualAppRDP/releases/tag/v1.0.0
