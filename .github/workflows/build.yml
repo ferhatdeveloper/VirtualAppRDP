@@ -117,26 +117,29 @@ jobs:
         run: |
           set -e
           # Build ve output dizinleri oluştur (Docker uid 1000 ile uyumlu)
-          mkdir -p build/output
-          chmod 777 build build/output
+          mkdir -p build/output output
+          chmod 777 build build/output output 2>/dev/null || true
           # Önce orijinal Client.iss'i dene
           if docker run --rm -i --user 1000:1000 \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Client.iss \
                > iscc_client.log 2>&1; then
-            echo "Original Client.iss derlendi (build/output/Output'a yazildi)."
-            # Output dizinini build/output'a tasi (ISCC varsayilan olarak ./Output yazar)
+            echo "Original Client.iss derlendi."
+            # Output dizinini build/output'a tasi (.iss'te OutputDir=output yazdik)
+            if [ -d "output" ]; then
+              mv -f output/*.exe build/output/ 2>/dev/null || true
+            fi
             if [ -d "Output" ]; then
               mv -f Output/*.exe build/output/ 2>/dev/null || true
             fi
           else
-            echo "Original Client.iss FAILED, minimal fallback yaziliyor..."
+            echo "Original Client.iss FAILED, fallback kullaniliyor..."
             cat iscc_client.log | tail -50
           fi
           # Eğer orijinal derlenmediyse harici fallback .iss dosyasını kullan
           if ! ls build/output/RdpVirtualBoxApp-Client-*.exe 1> /dev/null 2>&1; then
-            echo "Original Client.iss FAILED, fallback kullaniliyor: .github/fallback-iss/client.iss"
+            echo "Fallback .iss kullaniliyor: .github/fallback-iss/client.iss"
             cp .github/fallback-iss/client.iss build/client.iss
             chmod 777 build/client.iss
             if ! docker run --rm -i --user 1000:1000 \
@@ -146,33 +149,40 @@ jobs:
               cat iscc_client.log | tail -50
               exit 1
             fi
+            if [ -d "output" ]; then
+              mv -f output/*.exe build/output/ 2>/dev/null || true
+            fi
             if [ -d "Output" ]; then
               mv -f Output/*.exe build/output/ 2>/dev/null || true
             fi
           fi
-          ls -la build/output/*.exe
+          ls -la build/output/*.exe 2>&1 || { echo "ERROR: build/output/*.exe bulunamadi"; exit 1; }
 
       # ---------- 7. ISCC + Server setup derleme ----------
       - name: Build Server Setup via Docker Inno Setup
         shell: bash
         run: |
           set -e
-          chmod 777 build build/output
+          mkdir -p output
+          chmod 777 build build/output output 2>/dev/null || true
           if docker run --rm -i --user 1000:1000 \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Server.iss \
                > iscc_server.log 2>&1; then
             echo "Original Server.iss derlendi."
+            if [ -d "output" ]; then
+              mv -f output/*.exe build/output/ 2>/dev/null || true
+            fi
             if [ -d "Output" ]; then
               mv -f Output/*.exe build/output/ 2>/dev/null || true
             fi
           else
-            echo "Original Server.iss FAILED, minimal fallback yaziliyor..."
+            echo "Original Server.iss FAILED, fallback kullaniliyor..."
             cat iscc_server.log | tail -50
           fi
           if ! ls build/output/RdpVirtualBoxApp-Server-*.exe 1> /dev/null 2>&1; then
-            echo "Original Server.iss FAILED, fallback kullaniliyor: .github/fallback-iss/server.iss"
+            echo "Fallback .iss kullaniliyor: .github/fallback-iss/server.iss"
             cp .github/fallback-iss/server.iss build/server.iss
             chmod 777 build/server.iss
             if ! docker run --rm -i --user 1000:1000 \
@@ -181,6 +191,9 @@ jobs:
                  build/server.iss > iscc_server.log 2>&1; then
               cat iscc_server.log | tail -50
               exit 1
+            fi
+            if [ -d "output" ]; then
+              mv -f output/*.exe build/output/ 2>/dev/null || true
             fi
             if [ -d "Output" ]; then
               mv -f Output/*.exe build/output/ 2>/dev/null || true

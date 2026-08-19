@@ -19,7 +19,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=build/output
+OutputDir=output
 OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -28,19 +28,12 @@ VersionInfoCompany=Rdp Virtual Box App
 VersionInfoDescription=Rdp Virtual Box App Client Setup
 VersionInfoProductName=Rdp Virtual Box App Client
 VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
-UninstallDisplayIcon={app}\powershell\SetupUI.ps1
 UninstallDisplayName=Rdp Virtual Box App
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Tasks]
-Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
-
 [Files]
-Source: "src/powershell/client/*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/config/client/*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/assets/*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
@@ -48,12 +41,7 @@ Name: "{localappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
 Name: "{userdocs}\RdpVirtualBoxApp"; Permissions: users-modify
 
 [Icons]
-Name: "{group}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"
 Name: "{group}\Uninstall Rdp Virtual Box App"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"; Tasks: desktopicon
-
-[Run]
-Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch the Setup Wizard"; Flags: nowait postinstall skipifsilent; Parameters: "-ExecutionPolicy Bypass -File ""{app}\powershell\SetupUI.ps1"""
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"

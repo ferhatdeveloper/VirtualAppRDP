@@ -51,7 +51,7 @@ WizardImageFile=src\assets\server\server-banner.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 ; Output
-OutputDir=build\output
+OutputDir=output
 OutputBaseFilename=RdpVirtualBoxApp-Server-v{#MyAppVersion}
 ; Misc
 ShowLanguageDetectionWarning=no

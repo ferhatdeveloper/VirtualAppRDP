@@ -18,7 +18,7 @@ PrivilegesRequired=admin
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=build/output
+OutputDir=output
 OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -27,34 +27,19 @@ VersionInfoCompany=ferhatdeveloper
 VersionInfoDescription=Rdp Virtual Box App Server Setup
 VersionInfoProductName=Rdp Virtual Box App Server
 VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
-UninstallDisplayIcon={app}\PowerShell\ServerSetupUI.ps1
 UninstallDisplayName=Rdp Virtual Box App - Server
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Tasks]
-Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
-
 [Files]
-Source: "src/powershell/server/*.ps1"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/config/server/*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/assets/server/*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/assets/icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 
 [Dirs]
 Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
 Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Config"; Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Manifest"; Permissions: users-modify
 
 [Icons]
-Name: "{group}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"
 Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"; Tasks: desktopicon
-
-[Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; Description: "Launch Server Setup"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{commondata}\RdpVirtualBoxApp"
