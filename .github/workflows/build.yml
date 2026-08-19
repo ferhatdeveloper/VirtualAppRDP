@@ -156,12 +156,12 @@ jobs:
           # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
           # Önce orijinal Client.iss'i dene (root olarak ki tum dosyalari okuyabilsin)
-          # Debug: Once .iss dosyasinin icerigi goster (ilk 20 satir)
+          # Debug: .iss dosyasinin ve mount'un saglikli oldugunu goster
           echo "=== Client.iss ilk 20 satir ==="
           head -20 src/inno/RdpVirtualBoxApp-Client.iss
           echo "=== /work mount test ==="
           docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
-            ls /work/src/inno/ /work/src/powershell/client/ /work/src/assets/ /work/src/config/client/ 2>&1 | head -30 > /tmp/mount-test.txt
+            ls /work/src/inno/ /work/src/powershell/client/ /work/src/assets/ /work/src/config/client/ > /tmp/mount-test.txt 2>&1 || true
           cat /tmp/mount-test.txt
           if docker run --rm -i \
                -v "$(pwd):/work" \
