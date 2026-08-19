@@ -18,7 +18,7 @@
 [Setup]
 ; NOTE: AppId is a unique GUID identifying this product.
 ; Do NOT use the same AppId for different products.
-AppId={8B6A8C2D-1234-5678-9012-RDPVB-SERVER1}
+AppId=8B6A8C2D-1234-5678-9012-RDPVB-SERVER1
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -44,14 +44,14 @@ SolidCompression=yes
 LZMAUseSeparateProcess=yes
 LZMANumBlockThreads=8
 ; Visual assets (placeholders - swap when real art is available)
-SetupIconFile=..\assets\icon.ico
-WizardSmallImageFile=..\assets\server\server-wizard.bmp
-WizardImageFile=..\assets\server\server-banner.bmp
+SetupIconFile=src\assets\icon.ico
+WizardSmallImageFile=src\assets\server\server-wizard.bmp
+WizardImageFile=src\assets\server\server-banner.bmp
 ; Uninstaller
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 ; Output
-OutputDir=..\..\build\output
+OutputDir=build\output
 OutputBaseFilename=RdpVirtualBoxApp-Server-v{#MyAppVersion}
 ; Misc
 ShowLanguageDetectionWarning=no
@@ -71,17 +71,17 @@ Name: "startmenu";  Description: "{cm:CreateStartMenu}";  GroupDescription: "{cm
 
 [Files]
 ; PowerShell modules (Server-side)
-Source: "..\powershell\server\*.ps1";                    DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src\powershell\server\*.ps1";                   DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Config templates
-Source: "..\config\server\*";                            DestDir: "{app}\Config";    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src\config\server\*";                           DestDir: "{app}\Config";    Flags: ignoreversion recursesubdirs createallsubdirs
 ; Server assets (banners, icons)
-Source: "..\assets\server\*";                            DestDir: "{app}\Assets";    Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\assets\icon.ico";                            DestDir: "{app}\Assets";    Flags: ignoreversion
+Source: "src\assets\server\*";                           DestDir: "{app}\Assets";    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src\assets\icon.ico";                           DestDir: "{app}\Assets";    Flags: ignoreversion
 ; Inno assets (so the wizard image sources are present at runtime too)
-Source: "..\assets\server\server-wizard.bmp";            DestDir: "{app}\Assets";    Flags: ignoreversion
-Source: "..\assets\server\server-banner.bmp";            DestDir: "{app}\Assets";    Flags: ignoreversion
+Source: "src\assets\server\server-wizard.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
+Source: "src\assets\server\server-banner.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
 ; Optional helper scripts (Launch helper + README placeholder)
-Source: "..\powershell\server\ServerSetupUI.ps1";        DestDir: "{app}";           Flags: ignoreversion
+Source: "src\powershell\server\ServerSetupUI.ps1";       DestDir: "{app}";           Flags: ignoreversion
 
 [Dirs]
 Name: "{commondata}\RdpVirtualBoxApp";        Permissions: users-modify
@@ -149,7 +149,7 @@ begin
     // Touch a marker file so the wizard knows install completed cleanly
     SaveStringToFile(ExpandConstant('{commondata}\RdpVirtualBoxApp\installed.marker'),
                      Format('RdpVirtualBoxApp Server v%s installed on %s',
-                            [ExpandConstant('{#MyAppVersion}'],
+                            [ExpandConstant('{#MyAppVersion}'),
                              FormatDateTime('yyyy-mm-dd hh:nn:ss', Now)]),
                      False);
   end;

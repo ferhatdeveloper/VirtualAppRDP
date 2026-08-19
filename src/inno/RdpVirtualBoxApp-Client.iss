@@ -124,10 +124,6 @@ Type: filesandordirs; Name: "{userdocs}\{#MyAppShortName}"
 
 ; Registry entries the wizard may create
 Type: regkey; Key: "HKCU\Software\{#MyAppShortName}"
-Type: regkey; Key: "HKCU\Software\Microsoft\Windows\CurrentVersion\AppCompat\Layers\__RDPVB_DELETE__"
-
-; Remove the WinRM trusted-host entry added by the wizard (best-effort).
-Type: regkey; Key: "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap"
 
 [Messages]
 ; English custom messages (also act as the default fallback).
