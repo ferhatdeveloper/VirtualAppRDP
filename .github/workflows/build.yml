@@ -340,3 +340,17 @@ Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
             build/output/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
+
+      # ---------- 13. Diagnostik loglar (her zaman yükle, hata olsa bile) ----------
+      - name: Upload ISCC and analyzer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iscc-logs
+          path: |
+            iscc_client.log
+            iscc_server.log
+            analyzer.txt
+            build/**/*.iss
+          if-no-files-found: ignore
+          retention-days: 7
