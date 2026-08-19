@@ -1,0 +1,73 @@
+name: Diagnose ISCC
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show PowerShell version
+        shell: pwsh
+        run: |
+          Write-Host "pwsh: $($PSVersionTable.PSVersion)"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Run ISCC on minimal .iss
+        shell: pwsh
+        run: |
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          $isccVersion = (& $isccPath --version 2>&1 | Out-String).Trim()
+          Write-Host "ISCC: $isccVersion"
+          Write-Host "---"
+
+          # Minimal test script
+          @"
+[Setup]
+AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
+AppName=Test
+AppVersion=1.0.0
+AppVerName=Test 1.0.0
+DefaultDirName={autopf}\Test
+DefaultGroupName=Test
+DisableProgramGroupPage=yes
+OutputDir=build\output
+OutputBaseFilename=TestMinimal
+Compression=lzma2/ultra64
+[Files]
+[Icons]
+"@ | Set-Content -Path "minimal.iss" -Encoding UTF8
+
+          Write-Host "minimal.iss dosyasi olusturuldu. ISCC cagiriliyor..."
+          & $isccPath minimal.iss
+          Write-Host "Exit: $LASTEXITCODE"
+
+      - name: Run ISCC on actual Client.iss with verbose log
+        shell: pwsh
+        run: |
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          Write-Host "=== RdpVirtualBoxApp-Client.iss (raw) ==="
+          Get-Content "src\inno\RdpVirtualBoxApp-Client.iss" | Out-Host
+          Write-Host "==="
+          Write-Host "Calling ISCC with /O- (no output) for full diagnostics..."
+          & $isccPath /O- "src\inno\RdpVirtualBoxApp-Client.iss" 2>&1 | ForEach-Object { Write-Host "ISCC: $_" }
+          Write-Host "Exit code: $LASTEXITCODE"
+          if ($LASTEXITCODE -ne 0) {
+            # Try to find log file
+            Get-ChildItem -Recurse -Filter "*.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+          }
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iscc-logs
+          path: |
+            iscc_*.log
+            minimal.iss
+          if-no-files-found: ignore
