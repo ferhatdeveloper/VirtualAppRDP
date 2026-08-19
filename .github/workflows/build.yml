@@ -79,16 +79,22 @@ jobs:
           Write-Host "PSScriptAnalyzer: $((Get-Module PSScriptAnalyzer).Version)"
           Write-Host "Pester: $((Get-Module Pester).Version)"
 
-      # ---------- 4. Lint ----------
+      # ---------- 4. Lint (dosya bazlı - null-reference yapan dosya varsa atlanir) ----------
       - name: Run PSScriptAnalyzer (lint)
         shell: pwsh
         continue-on-error: true
         run: |
           $results = @()
-          try {
-            $results = Invoke-ScriptAnalyzer -Path ./src -Recurse -ErrorAction SilentlyContinue
-          } catch {
-            Write-Host "PSScriptAnalyzer exception (devam ediliyor): $_"
+          $psFiles = @(Get-ChildItem -Path ./src -Recurse -Filter *.ps1 -ErrorAction SilentlyContinue)
+          foreach ($f in $psFiles) {
+            try {
+              $fileResults = Invoke-ScriptAnalyzer -Path $f.FullName -ErrorAction SilentlyContinue
+              if ($fileResults) {
+                $results += $fileResults
+              }
+            } catch {
+              Write-Host "PSScriptAnalyzer '$($f.FullName)' icin exception (atlaniyor): $_"
+            }
           }
           $results | Tee-Object -FilePath analyzer.txt
           $errCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
