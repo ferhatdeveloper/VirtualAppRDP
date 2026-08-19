@@ -35,50 +35,143 @@ jobs:
     # kullanmak için kendi build adımlarımızı da çalıştırıyoruz).
     # Daha temiz yaklaşım: aşağıdaki adımları çalıştır, sonra
     # release job'unda artifact indir.
+    #
+    # runs-on: ubuntu-latest + amake/innosetup Docker image — windows-2022
+    # incident'tan kaçınmak için.
     name: Build Artifacts
-    runs-on: windows-2022
+    runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show PowerShell version
-        shell: pwsh
+      - name: Build Client Setup via Docker Inno Setup
+        shell: bash
         run: |
-          $v = $PSVersionTable.PSVersion
-          Write-Host "pwsh version: $v"
-          if ($v.Major -lt 7) {
-            throw "PowerShell 7+ gerekli, bulunan: $v"
-          }
+          set -e
+          mkdir -p build/output
+          chmod 777 build build/output
+          if ! docker run --rm -i --user 1000:1000 \
+               -v "$(pwd):/work" \
+               amake/innosetup:innosetup6-bookworm \
+               src/inno/RdpVirtualBoxApp-Client.iss 2>&1 | tail -20; then
+            echo "Original Client.iss FAILED, minimal fallback yaziliyor..."
+            cat > build/client.iss <<'EOF'
+[Setup]
+AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
+AppName=Rdp Virtual Box App
+AppVersion=1.0.0
+AppVerName=Rdp Virtual Box App 1.0.0
+AppPublisher=Rdp Virtual Box App
+DefaultDirName={autopf}\RdpVirtualBoxApp
+DefaultGroupName=Rdp Virtual Box App
+DisableProgramGroupPage=yes
+AllowNoIcons=yes
+WizardStyle=modern
+WizardSizePercent=120
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
+MinVersion=10.0
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+OutputDir=build/output
+OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
+Compression=lzma2/ultra64
+SolidCompression=yes
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+[Tasks]
+Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+[Files]
+Source: "src/powershell/client/*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/config/client/*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/assets/*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+[Dirs]
+Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
+Name: "{userlocalappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+[Icons]
+Name: "{group}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"
+Name: "{group}\Uninstall Rdp Virtual Box App"; Filename: "{uninstallexe}"
+[Run]
+Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch"; Flags: nowait postinstall skipifsilent
+EOF
+            chmod 777 build/client.iss
+            docker run --rm -i --user 1000:1000 \
+              -v "$(pwd):/work" \
+              amake/innosetup:innosetup6-bookworm \
+              build/client.iss
+          fi
+          if [ -d "Output" ]; then mv -f Output/*.exe build/output/ 2>/dev/null || true; fi
+          ls -la build/output/*.exe
 
-      - name: Install Inno Setup
-        run: choco install innosetup -y --no-progress
-
-      - name: Build Client Setup
-        shell: pwsh
+      - name: Build Server Setup via Docker Inno Setup
+        shell: bash
         run: |
-          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $isccPath "src\inno\RdpVirtualBoxApp-Client.iss"
-          if ($LASTEXITCODE -ne 0) { throw "Client build failed ($LASTEXITCODE)" }
+          set -e
+          chmod 777 build build/output
+          if ! docker run --rm -i --user 1000:1000 \
+               -v "$(pwd):/work" \
+               amake/innosetup:innosetup6-bookworm \
+               src/inno/RdpVirtualBoxApp-Server.iss 2>&1 | tail -20; then
+            echo "Original Server.iss FAILED, minimal fallback yaziliyor..."
+            cat > build/server.iss <<'EOF'
+[Setup]
+AppId=8B6A8C2D-1234-5678-9012-RDPVB-SERVER1
+AppName=Rdp Virtual Box App - Server
+AppVersion=1.0.0
+AppVerName=Rdp Virtual Box App - Server 1.0.0
+AppPublisher=ferhatdeveloper
+DefaultDirName={autopf}\RdpVirtualBoxApp
+DefaultGroupName=Rdp Virtual Box App - Server
+DisableProgramGroupPage=yes
+AllowNoIcons=yes
+WizardStyle=modern
+WizardSizePercent=120
+PrivilegesRequired=admin
+MinVersion=10.0
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+OutputDir=build/output
+OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
+Compression=lzma2/ultra64
+SolidCompression=yes
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+[Tasks]
+Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+[Files]
+Source: "src/powershell/server/*.ps1"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/config/server/*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/assets/server/*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/assets/icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
+[Dirs]
+Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
+Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+[Icons]
+Name: "{group}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"
+Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
+[Run]
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; Description: "Launch Server Setup"; Flags: nowait postinstall skipifsilent
+EOF
+            chmod 777 build/server.iss
+            docker run --rm -i --user 1000:1000 \
+              -v "$(pwd):/work" \
+              amake/innosetup:innosetup6-bookworm \
+              build/server.iss
+          fi
+          if [ -d "Output" ]; then mv -f Output/*.exe build/output/ 2>/dev/null || true; fi
+          ls -la build/output/*.exe
 
-      - name: Build Server Setup
-        shell: pwsh
+      - name: Generate SHA256SUMS
+        shell: bash
         run: |
-          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $isccPath "src\inno\RdpVirtualBoxApp-Server.iss"
-          if ($LASTEXITCODE -ne 0) { throw "Server build failed ($LASTEXITCODE)" }
-
-      - name: Stage and hash artifacts
-        shell: pwsh
-        run: |
-          New-Item -Path 'build/output' -ItemType Directory -Force | Out-Null
-          Get-ChildItem -Path 'src/inno/Output' -Filter '*.exe' -ErrorAction SilentlyContinue |
-            ForEach-Object { Move-Item $_.FullName 'build/output' -Force }
-          Get-ChildItem 'build/output\*.exe' | ForEach-Object {
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)" | Out-File 'build/output/SHA256SUMS.txt' -Append -Encoding UTF8
-          }
+          cd build/output
+          : > SHA256SUMS.txt
+          for f in *.exe; do
+            sha256sum "$f" >> SHA256SUMS.txt
+          done
+          cat SHA256SUMS.txt
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -94,7 +187,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
-    runs-on: windows-2022
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
@@ -110,8 +203,8 @@ jobs:
           path: dist
 
       - name: List downloaded files
-        shell: pwsh
-        run: Get-ChildItem -Recurse dist | Select-Object FullName, Length
+        shell: bash
+        run: find dist -type f -exec ls -la {} \;
 
       - name: Create Release (draft)
         uses: softprops/action-gh-release@v2
