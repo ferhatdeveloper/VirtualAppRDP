@@ -58,7 +58,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 
 ; Output (CI uses ISCC default ./Output; the workflow moves it)
 OutputBaseFilename=RdpVirtualBoxApp-Client-v{#MyAppVersion}
-SetupIconFile=src\assets\icon.ico
+SetupIconFile=..\assets\icon.ico
 UninstallDisplayIcon={app}\assets\icon.ico
 UninstallDisplayName={#MyAppName}
 
@@ -67,7 +67,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 
 ; Optional licence / version metadata
-LicenseFile=LICENSE
+LicenseFile=..\LICENSE
 VersionInfoVersion={#MyAppVersion}.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Client Setup
@@ -86,18 +86,18 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; PowerShell wizard and helper modules
-Source: "src\powershell\client\*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\powershell\client\*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Configuration templates (apps, rdp, web)
-Source: "src\config\client\*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\config\client\*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Icons, banner, wizard images
-Source: "src\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 ; Per-user working folders created up-front so the wizard can write to them.
 Name: "{userappdata}\{#MyAppShortName}"; Permissions: users-modify
-Name: "{userlocalappdata}\{#MyAppShortName}\Logs"; Permissions: users-modify
+Name: "{localappdata}\{#MyAppShortName}\Logs"; Permissions: users-modify
 Name: "{userdocs}\{#MyAppShortName}"; Permissions: users-modify
 
 [Icons]
