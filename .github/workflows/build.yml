@@ -45,10 +45,12 @@ jobs:
         uses: actions/checkout@v4
 
       # ---------- 2. PowerShell 7.4 kurulumu ----------
+      # NOT: actions/setup-powershell GitHub Marketplace'ten kaldırıldığı için
+      # mchave3/setup-pwsh kullanılıyor (input adı: version).
       - name: Setup PowerShell 7.4
-        uses: actions/setup-powershell@v4
+        uses: mchave3/setup-pwsh@v1.0.0
         with:
-          pwsh-version: '7.4'
+          version: '7.4'
 
       # ---------- 3. PSScriptAnalyzer kurulumu ----------
       - name: Install PSScriptAnalyzer
