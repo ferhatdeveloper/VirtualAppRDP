@@ -14,7 +14,7 @@
 
 #define MyAppName            "Rdp Virtual Box App"
 #define MyAppShortName        "RdpVirtualBoxApp"
-#define MyAppVersion          "1.0.0"
+#define MyAppVersion          "1.0.1"
 #define MyAppPublisher        "Rdp Virtual Box App"
 #define MyAppURL              "https://github.com/ferhatdeveloper/VirtualAppRDP"
 #define MyAppSupportURL       "https://github.com/ferhatdeveloper/VirtualAppRDP/issues"

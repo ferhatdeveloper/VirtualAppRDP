@@ -10,7 +10,7 @@
 
 #define MyAppName      "Rdp Virtual Box App - Server"
 #define MyAppShortName  "RdpVirtualBoxApp-Server"
-#define MyAppVersion    "1.0.0"
+#define MyAppVersion    "1.0.1"
 #define MyAppPublisher  "ferhatdeveloper"
 #define MyAppURL        "https://github.com/ferhatdeveloper/VirtualAppRDP"
 #define MyAppExeName    "ServerSetupUI.ps1"
