@@ -20,8 +20,8 @@ struct Step1ServerInfo: View {
 
             Form {
                 TextField(store.strings.serverIpLabel, text: $store.state.server.ip)
-                    .textContentType(.URL)
                     .disableAutocorrection(true)
+                    .autocorrectionDisabled(true)
 
                 Stepper(value: $store.state.server.port, in: 1...65535) {
                     HStack {

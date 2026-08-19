@@ -84,8 +84,25 @@ public struct ServerInfo: Codable, Equatable, Sendable {
     private static func isValidHost(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { return false }
-        let ipv4 = #"^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$"#
-        if trimmed.range(of: ipv4, options: .regularExpression) != nil { return true }
+        // IPv4: 0-255 her octet; 1?\d?\d yalniz tek basamakli/iki basamakli ile eslesir
+        // ama "999" uc basamaga izin vermez (1?\d?\d -> max 199). Bu nedenle
+        // parcalara ayirip kontrol etmek daha guvenli.
+        let parts = trimmed.split(separator: ".")
+        if parts.count == 4 {
+            var allNumeric = true
+            var allValid = true
+            for p in parts {
+                if let n = Int(p), (0...255).contains(n) {
+                    // basinda sifir olanlar "01" gibi kabul edilmez (RFC)
+                    if p.count > 1 && p.first == "0" { allValid = false; break }
+                    _ = n
+                } else {
+                    allNumeric = false
+                    break
+                }
+            }
+            if allNumeric && allValid { return true }
+        }
         let hostname = #"^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"#
         return trimmed.range(of: hostname, options: .regularExpression) != nil
     }
