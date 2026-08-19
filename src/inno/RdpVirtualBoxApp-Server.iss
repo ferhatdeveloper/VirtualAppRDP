@@ -51,6 +51,7 @@ WizardImageFile=..\assets\server\server-banner.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 ; Output
+OutputDir=Z:\work\build\output
 OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.1
 ; Misc
 AppMutex=RdpVirtualBoxApp-Server-Setup-Mutex
