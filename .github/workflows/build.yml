@@ -155,17 +155,14 @@ jobs:
           chmod 777 build build/output output 2>/dev/null || true
           # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          # Docker container icindeki yollari test et
-          echo "=== Docker icinde /work/src test ==="
-          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
-            ls -la /work/src/inno/ 2>&1 | head -5
-          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
-            ls -la /work/src/powershell/client/ 2>&1 | head -5
-          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
-            ls -la /work/src/assets/ 2>&1 | head -5
-          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
-            ls -la /work/src/config/client/ 2>&1 | head -5
           # Önce orijinal Client.iss'i dene (root olarak ki tum dosyalari okuyabilsin)
+          # Debug: Once .iss dosyasinin icerigi goster (ilk 20 satir)
+          echo "=== Client.iss ilk 20 satir ==="
+          head -20 src/inno/RdpVirtualBoxApp-Client.iss
+          echo "=== /work mount test ==="
+          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
+            ls /work/src/inno/ /work/src/powershell/client/ /work/src/assets/ /work/src/config/client/ 2>&1 | head -30 > /tmp/mount-test.txt
+          cat /tmp/mount-test.txt
           if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
@@ -182,7 +179,8 @@ jobs:
             fi
           else
             echo "Original Client.iss FAILED, fallback kullaniliyor..."
-            cat iscc_client.log | tail -50
+            cat iscc_client.log
+            echo "=== ISCC Client log son ==="
           fi
           # Eğer orijinal derlenmediyse harici fallback .iss dosyasını kullan
           if ! ls build/output/RdpVirtualBoxApp-Client-*.exe 1> /dev/null 2>&1; then
@@ -227,7 +225,8 @@ jobs:
             fi
           else
             echo "Original Server.iss FAILED, fallback kullaniliyor..."
-            cat iscc_server.log | tail -50
+            cat iscc_server.log
+            echo "=== ISCC Server log son ==="
           fi
           if ! ls build/output/RdpVirtualBoxApp-Server-*.exe 1> /dev/null 2>&1; then
             echo "Fallback .iss kullaniliyor: .github/fallback-iss/server.iss"
