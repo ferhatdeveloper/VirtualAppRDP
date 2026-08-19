@@ -64,7 +64,7 @@ UninstallDisplayIcon={app}\assets\icon.ico
 UninstallDisplayName={#MyAppName}
 
 ; Compression
-Compression=lzma2/ultra64
+Compression=lzma2/ultra
 SolidCompression=yes
 
 ; Optional licence / version metadata

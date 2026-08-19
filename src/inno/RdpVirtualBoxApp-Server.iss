@@ -39,7 +39,7 @@ AllowNoIcons=yes
 WizardStyle=modern
 WizardSizePercent=120
 ; Compression: lzma2 / ultra64
-Compression=lzma2/ultra64
+Compression=lzma2/ultra
 SolidCompression=yes
 LZMAUseSeparateProcess=yes
 LZMANumBlockThreads=8
