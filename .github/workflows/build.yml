@@ -164,7 +164,7 @@ jobs:
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                build/RdpVirtualBoxApp-Client.iss \
-               > iscc_client.log 2>&1; then
+               > iscc_client_orig.log 2>&1; then
             echo "Original Client.iss derlendi."
             echo "Original Client.iss derlendi."
             # Output dizinini build/output'a tasi (.iss'te OutputDir=output yazdik)
@@ -176,7 +176,7 @@ jobs:
             fi
           else
             echo "Original Client.iss FAILED, fallback kullaniliyor..."
-            cat iscc_client.log
+            cat iscc_client_orig.log
             echo "=== ISCC Client log son ==="
           fi
           # Eğer orijinal derlenmediyse harici fallback .iss dosyasını kullan
@@ -215,7 +215,7 @@ jobs:
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                build/RdpVirtualBoxApp-Server.iss \
-               > iscc_server.log 2>&1; then
+               > iscc_server_orig.log 2>&1; then
             echo "Original Server.iss derlendi."
             if [ -d "output" ]; then
               mv -f output/*.exe build/output/ 2>/dev/null || true
@@ -225,7 +225,7 @@ jobs:
             fi
           else
             echo "Original Server.iss FAILED, fallback kullaniliyor..."
-            cat iscc_server.log
+            cat iscc_server_orig.log
             echo "=== ISCC Server log son ==="
           fi
           if ! ls build/output/RdpVirtualBoxApp-Server-*.exe 1> /dev/null 2>&1; then
