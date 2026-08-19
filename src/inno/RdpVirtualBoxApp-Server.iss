@@ -18,7 +18,7 @@
 [Setup]
 ; NOTE: AppId is a unique GUID identifying this product.
 ; Do NOT use the same AppId for different products.
-AppId={{8B6A8C2D-1234-5678-9012-RDPVB-SERVER}
+AppId={8B6A8C2D-1234-5678-9012-RDPVB-SERVER1}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
