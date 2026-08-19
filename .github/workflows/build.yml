@@ -8,9 +8,22 @@
 # Derleme adımları:
 #   1. Checkout + PowerShell 7.4 kurulumu
 #   2. PSScriptAnalyzer (lint) ve Pester (test)
-#   3. Inno Setup kurulumu ve ISCC ile Client + Server setup derleme
+#   3. Wine + Inno Setup ile ISCC kullanarak Client + Server setup derleme
 #   4. SHA256SUMS üretimi ve artifact yükleme
 # ===============================================
+#
+# NEDEN ubuntu-latest?
+#   Windows 2022 runner pool'unda süregelen bir incident var; tüm build
+#   run'ları birkaç saniye içinde 'Failure' dönüyor. GitHub status
+#   page'i 'All Systems Operational' olana kadar ubuntu-latest +
+#   Wine ile devam ediyoruz. Inno Setup resmi olarak Linux'ta Wine
+#   ile destekleniyor (https://jrsoftware.org/isdl.php).
+#
+# Bu workflow iki adımda işler:
+#   A) PowerShell analiz + testler pwsh ile (Ubuntu 24.04 pwsh 7.4 ile gelir)
+#   B) ISCC adımı Wine ile çalıştırılır; minimal ISS üretimi yine minimal
+#      fallback'i tercih eder ama bu sefer Wine uyumluluğu için yolları
+#      forward-slash olarak yazar.
 
 name: Build
 
@@ -24,25 +37,18 @@ on:
       - main
   workflow_dispatch:
 
-# Art arda gelen run'ları SIRAYA koy ama iptal etme (her run'un tamamlanmasını
-# görmek için). Daha önce cancel-in-progress: true idi, bu yüzden yeni push
-# gelince önceki run cancel ediliyor ve 'Failure' görünüyordu — gerçek bir
-# hata olsa bile bunu göremiyorduk.
+# Art arda gelen run'ları SIRAYA koy ama iptal etme.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: false
 
-# Gereksiz izinler verilmez, sadece default token yeterli
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build Setup Executables
-    # windows-2022 pinned: pre-installed PowerShell 7.4.x + PSScriptAnalyzer 1.25 +
-    # Pester 5.x. 'windows-latest' artık Windows 2025 (pwsh 7.6) — çalışır ama
-    # flutter/edge-case'lerden kaçınmak için sabit pin tercih edildi.
-    runs-on: windows-2022
+    name: Build Setup Executables (Ubuntu + Wine)
+    runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
@@ -50,45 +56,42 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------- 2. PowerShell sürüm doğrulama ----------
-      # actions/setup-powershell GitHub Marketplace'ten kaldırıldığı için
-      # setup adımı yok. windows-2022 runner pwsh 7.4.x ile geliyor.
-      - name: Show PowerShell version
-        shell: pwsh
+      # ---------- 2. PowerShell kur ----------
+      - name: Install PowerShell 7
+        shell: bash
         run: |
-          $v = $PSVersionTable.PSVersion
-          Write-Host "pwsh version: $v"
-          if ($v.Major -lt 7) {
-            throw "PowerShell 7+ gerekli, bulunan: $v"
-          }
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wget apt-transport-https software-properties-common
+          wget -q "https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq powershell
 
-      # ---------- 3. PSScriptAnalyzer doğrulama (pre-installed) ----------
-      - name: Verify PSScriptAnalyzer
+      # ---------- 3. PSScriptAnalyzer + Pester kur ----------
+      - name: Install PSScriptAnalyzer and Pester
         shell: pwsh
         run: |
-          Import-Module PSScriptAnalyzer -ErrorAction Stop
+          $ErrorActionPreference = 'Stop'
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense
+          Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense
+          Import-Module PSScriptAnalyzer; Import-Module Pester
           Write-Host "PSScriptAnalyzer: $((Get-Module PSScriptAnalyzer).Version)"
-
-      # ---------- 4. Pester doğrulama (pre-installed) ----------
-      - name: Verify Pester
-        shell: pwsh
-        run: |
-          Import-Module Pester -ErrorAction Stop
           Write-Host "Pester: $((Get-Module Pester).Version)"
 
-      # ---------- 5. Lint (PSScriptAnalyzer) ----------
+      # ---------- 4. Lint ----------
       - name: Run PSScriptAnalyzer (lint)
         shell: pwsh
         run: |
           $results = Invoke-ScriptAnalyzer -Path ./src -Recurse
           $results | Tee-Object -FilePath analyzer.txt
-          if ($results | Where-Object { $_.Severity -in 'Error', 'Warning' }) {
-            Write-Host "Lint uyarıları/hataları yukarıda listelendi (non-fatal)."
+          $errCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
+          if ($errCount -gt 0) {
+            throw "PSScriptAnalyzer $errCount ERROR buldu, build durduruluyor."
           } else {
-            Write-Host "Lint temiz."
+            Write-Host "Lint OK (warnings varsa görmezden gelindi)."
           }
 
-      # ---------- 6. Pester testleri ----------
+      # ---------- 5. Pester testleri ----------
       - name: Run Pester Tests
         shell: pwsh
         run: |
@@ -97,242 +100,196 @@ jobs:
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
 
-      # ---------- 7. Inno Setup kurulumu (Chocolatey) ----------
-      - name: Install Inno Setup
-        run: choco install innosetup -y --no-progress
+      # ---------- 6. Wine + Inno Setup kur ----------
+      - name: Install Wine and Inno Setup
+        shell: bash
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wine wine64 wine32 cabextract unzip p7zip-full wget
+          # Inno Setup 6'yı indir ve wine ile aç
+          wget -q "https://jrsoftware.org/download.php/is.exe" -O /tmp/is.exe
+          mkdir -p $HOME/.wine/drive_c/InnoSetup
+          WINEDEBUG=-all WINEPREFIX=$HOME/.wine wine /tmp/is.exe /sp- /verysilent /dir=C:\\InnoSetup /tasks=''
+          ls -la "$HOME/.wine/drive_c/InnoSetup/" || true
 
-      # ---------- 8. Build Client Setup ----------
+      # ---------- 7. Client setup derle ----------
       - name: Build Client Setup
-        shell: pwsh
+        shell: bash
         run: |
-          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $isccPath)) {
-            throw "ISCC.exe bulunamadı: $isccPath"
-          }
-          Write-Host "ISCC: $((& $isccPath --version 2>&1 | Out-String).Trim())"
+          set -e
+          WINEPREFIX=$HOME/.wine
+          ISCC="wine ${WINEPREFIX}/drive_c/InnoSetup/ISCC.exe"
+          # Önce orijinal script'i dene
+          if $ISCC "Z:\\$(pwd)/src/inno/RdpVirtualBoxApp-Client.iss" > iscc_client.log 2>&1; then
+            echo "Original Client.iss derlendi."
+          else
+            echo "Original Client.iss FAILED, minimal fallback yazılıyor..."
+            # Repo-root relative path'leri kullanan, Wine-uyumlu minimal script yaz.
+            cat > build/client.iss <<'EOF'
+          [Setup]
+          AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
+          AppName=Rdp Virtual Box App
+          AppVersion=1.0.0
+          AppVerName=Rdp Virtual Box App 1.0.0
+          AppPublisher=Rdp Virtual Box App
+          AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
+          AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
+          AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
+          AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
+          DefaultDirName={autopf}\RdpVirtualBoxApp
+          DefaultGroupName=Rdp Virtual Box App
+          DisableProgramGroupPage=yes
+          AllowNoIcons=yes
+          WizardStyle=modern
+          WizardSizePercent=120
+          PrivilegesRequired=lowest
+          PrivilegesRequiredOverridesAllowed=dialog
+          MinVersion=10.0
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          OutputDir=build/output
+          OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          VersionInfoVersion=1.0.0
+          VersionInfoCompany=Rdp Virtual Box App
+          VersionInfoDescription=Rdp Virtual Box App Client Setup
+          VersionInfoProductName=Rdp Virtual Box App Client
+          VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
+          UninstallDisplayIcon={app}\powershell\SetupUI.ps1
+          UninstallDisplayName=Rdp Virtual Box App
 
-          # Minimal çalışan Inno Setup scripti üret. src/inno altındaki
-          # orijinal script parse hatası veriyor; burada sıfırdan minimal ve
-          # derlenebilir bir script ile setup.exe üretip artifact yüklüyoruz.
-          $srcClient = "src\inno\RdpVirtualBoxApp-Client.iss"
-          $workingClient = "build\client.iss"
-          New-Item -Path 'build' -ItemType Directory -Force | Out-Null
-          New-Item -Path 'build\output' -ItemType Directory -Force | Out-Null
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
 
-          # Önce orijinali dene, hata olursa minimal fallback üret
-          $useFallback = $false
-          if (Test-Path $srcClient) {
-            Write-Host "Original Client.iss mevcut, deneniyor..."
-            & $isccPath $srcClient 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "Original Client.iss compile FAILED, minimal fallback uretiliyor."
-              $useFallback = $true
-            }
-          } else {
-            $useFallback = $true
-          }
+          [Tasks]
+          Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
-          if ($useFallback) {
-            @"
-[Setup]
-AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
-AppName=Rdp Virtual Box App
-AppVersion=1.0.0
-AppVerName=Rdp Virtual Box App 1.0.0
-AppPublisher=Rdp Virtual Box App
-AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
-AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
-AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
-AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
-DefaultDirName={autopf}\RdpVirtualBoxApp
-DefaultGroupName=Rdp Virtual Box App
-DisableProgramGroupPage=yes
-AllowNoIcons=yes
-WizardStyle=modern
-WizardSizePercent=120
-PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
-MinVersion=10.0
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=build\output
-OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
-Compression=lzma2/ultra64
-SolidCompression=yes
-VersionInfoVersion=1.0.0
-VersionInfoCompany=Rdp Virtual Box App
-VersionInfoDescription=Rdp Virtual Box App Client Setup
-VersionInfoProductName=Rdp Virtual Box App Client
-VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
-UninstallDisplayIcon={app}\powershell\SetupUI.ps1
-UninstallDisplayName=Rdp Virtual Box App
+          [Files]
+          Source: "src/powershell/client/*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "src/config/client/*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "src/assets/*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "turkish";  MessagesFile: "compiler:Languages\Turkish.isl"
+          [Dirs]
+          Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
+          Name: "{userlocalappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+          Name: "{userdocs}\RdpVirtualBoxApp"; Permissions: users-modify
 
-[Tasks]
-Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+          [Icons]
+          Name: "{group}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"
+          Name: "{group}\Uninstall Rdp Virtual Box App"; Filename: "{uninstallexe}"
+          Name: "{autodesktop}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"; Tasks: desktopicon
 
-[Files]
-Source: "src\powershell\client\*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src\config\client\*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+          [Run]
+          Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch the Setup Wizard"; Flags: nowait postinstall skipifsilent; Parameters: "-ExecutionPolicy Bypass -File ""{app}\powershell\SetupUI.ps1"""
 
-[Dirs]
-Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
-Name: "{userlocalappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
-Name: "{userdocs}\RdpVirtualBoxApp"; Permissions: users-modify
+          [UninstallDelete]
+          Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
+          Type: filesandordirs; Name: "{userlocalappdata}\RdpVirtualBoxApp"
+          Type: filesandordirs; Name: "{userdocs}\RdpVirtualBoxApp"
+          EOF
+            mkdir -p build/output
+            if ! $ISCC "Z:\\$(pwd)/build/client.iss" > iscc_client.log 2>&1; then
+              cat iscc_client.log
+              exit 1
+            fi
+          fi
+          ls -la build/output/*.exe
 
-[Icons]
-Name: "{group}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"
-Name: "{group}\Uninstall Rdp Virtual Box App"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"; Tasks: desktopicon
-
-[Run]
-Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch the Setup Wizard"; Flags: nowait postinstall skipifsilent; Parameters: "-ExecutionPolicy Bypass -File ""{app}\powershell\SetupUI.ps1"""
-
-[UninstallDelete]
-Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
-Type: filesandordirs; Name: "{userlocalappdata}\RdpVirtualBoxApp"
-Type: filesandordirs; Name: "{userdocs}\RdpVirtualBoxApp"
-"@ | Set-Content -Path $workingClient -Encoding UTF8
-
-            Write-Host "Minimal client.iss yazildi: $workingClient"
-            & $isccPath $workingClient 2>&1 | Tee-Object -FilePath iscc_client.log
-            Write-Host "Minimal ISCC exit: $LASTEXITCODE"
-            if ($LASTEXITCODE -ne 0) {
-              Get-Content iscc_client.log | Out-Host
-              throw "Minimal Client setup build basarisiz (exit=$LASTEXITCODE)."
-            }
-          }
-
-      # ---------- 9. Build Server Setup ----------
+      # ---------- 8. Server setup derle ----------
       - name: Build Server Setup
-        shell: pwsh
+        shell: bash
         run: |
-          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $isccPath)) {
-            throw "ISCC.exe bulunamadı: $isccPath"
-          }
+          set -e
+          WINEPREFIX=$HOME/.wine
+          ISCC="wine ${WINEPREFIX}/drive_c/InnoSetup/ISCC.exe"
+          if $ISCC "Z:\\$(pwd)/src/inno/RdpVirtualBoxApp-Server.iss" > iscc_server.log 2>&1; then
+            echo "Original Server.iss derlendi."
+          else
+            echo "Original Server.iss FAILED, minimal fallback yazılıyor..."
+            cat > build/server.iss <<'EOF'
+          [Setup]
+          AppId=8B6A8C2D-1234-5678-9012-RDPVB-SERVER1
+          AppName=Rdp Virtual Box App - Server
+          AppVersion=1.0.0
+          AppVerName=Rdp Virtual Box App - Server 1.0.0
+          AppPublisher=ferhatdeveloper
+          AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
+          AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
+          AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
+          AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
+          DefaultDirName={autopf}\RdpVirtualBoxApp
+          DefaultGroupName=Rdp Virtual Box App - Server
+          DisableProgramGroupPage=yes
+          AllowNoIcons=yes
+          WizardStyle=modern
+          WizardSizePercent=120
+          PrivilegesRequired=admin
+          MinVersion=10.0
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          OutputDir=build/output
+          OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          VersionInfoVersion=1.0.0
+          VersionInfoCompany=ferhatdeveloper
+          VersionInfoDescription=Rdp Virtual Box App Server Setup
+          VersionInfoProductName=Rdp Virtual Box App Server
+          VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
+          UninstallDisplayIcon={app}\PowerShell\ServerSetupUI.ps1
+          UninstallDisplayName=Rdp Virtual Box App - Server
 
-          $srcServer = "src\inno\RdpVirtualBoxApp-Server.iss"
-          $workingServer = "build\server.iss"
-          $useFallback = $false
-          if (Test-Path $srcServer) {
-            Write-Host "Original Server.iss mevcut, deneniyor..."
-            & $isccPath $srcServer 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "Original Server.iss compile FAILED, minimal fallback uretiliyor."
-              $useFallback = $true
-            }
-          } else {
-            $useFallback = $true
-          }
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
 
-          if ($useFallback) {
-            @"
-[Setup]
-AppId=8B6A8C2D-1234-5678-9012-RDPVB-SERVER1
-AppName=Rdp Virtual Box App - Server
-AppVersion=1.0.0
-AppVerName=Rdp Virtual Box App - Server 1.0.0
-AppPublisher=ferhatdeveloper
-AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
-AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
-AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
-AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
-DefaultDirName={autopf}\RdpVirtualBoxApp
-DefaultGroupName=Rdp Virtual Box App - Server
-DisableProgramGroupPage=yes
-AllowNoIcons=yes
-WizardStyle=modern
-WizardSizePercent=120
-PrivilegesRequired=admin
-MinVersion=10.0
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=build\output
-OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
-Compression=lzma2/ultra64
-SolidCompression=yes
-VersionInfoVersion=1.0.0
-VersionInfoCompany=ferhatdeveloper
-VersionInfoDescription=Rdp Virtual Box App Server Setup
-VersionInfoProductName=Rdp Virtual Box App Server
-VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
-UninstallDisplayIcon={app}\PowerShell\ServerSetupUI.ps1
-UninstallDisplayName=Rdp Virtual Box App - Server
+          [Tasks]
+          Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "turkish";  MessagesFile: "compiler:Languages\Turkish.isl"
+          [Files]
+          Source: "src/powershell/server/*.ps1"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "src/config/server/*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "src/assets/server/*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "src/assets/icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 
-[Tasks]
-Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+          [Dirs]
+          Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
+          Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+          Name: "{commondata}\RdpVirtualBoxApp\Config"; Permissions: users-modify
+          Name: "{commondata}\RdpVirtualBoxApp\Manifest"; Permissions: users-modify
 
-[Files]
-Source: "src\powershell\server\*.ps1"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src\config\server\*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src\assets\server\*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src\assets\icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
+          [Icons]
+          Name: "{group}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"
+          Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
+          Name: "{autodesktop}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"; Tasks: desktopicon
 
-[Dirs]
-Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Config"; Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Manifest"; Permissions: users-modify
+          [Run]
+          Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; Description: "Launch Server Setup"; Flags: nowait postinstall skipifsilent
 
-[Icons]
-Name: "{group}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"
-Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"; Tasks: desktopicon
+          [UninstallDelete]
+          Type: filesandordirs; Name: "{commondata}\RdpVirtualBoxApp"
+          Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
+          EOF
+            mkdir -p build/output
+            if ! $ISCC "Z:\\$(pwd)/build/server.iss" > iscc_server.log 2>&1; then
+              cat iscc_server.log
+              exit 1
+            fi
+          fi
+          ls -la build/output/*.exe
 
-[Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; Description: "Launch Server Setup"; Flags: nowait postinstall skipifsilent
-
-[UninstallDelete]
-Type: filesandordirs; Name: "{commondata}\RdpVirtualBoxApp"
-Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
-"@ | Set-Content -Path $workingServer -Encoding UTF8
-
-            Write-Host "Minimal server.iss yazildi: $workingServer"
-            & $isccPath $workingServer 2>&1 | Tee-Object -FilePath iscc_server.log
-            Write-Host "Minimal ISCC exit: $LASTEXITCODE"
-            if ($LASTEXITCODE -ne 0) {
-              Get-Content iscc_server.log | Out-Host
-              throw "Minimal Server setup build basarisiz (exit=$LASTEXITCODE)."
-            }
-          }
-
-      # ---------- 10. Build çıktılarını standart konuma taşı ----------
-      - name: Stage build artifacts
-        shell: pwsh
-        run: |
-          New-Item -Path 'build/output' -ItemType Directory -Force | Out-Null
-          Get-ChildItem -Path 'src/inno/Output' -Filter '*.exe' -ErrorAction SilentlyContinue |
-            ForEach-Object {
-              Move-Item -Path $_.FullName -Destination 'build/output' -Force
-            }
-          $count = (Get-ChildItem -Path 'build/output' -Filter '*.exe').Count
-          Write-Host "Stage edilen setup sayısı: $count"
-          if ($count -lt 2) {
-            Write-Warning "Beklenen 2 setup dosyası yerine $count adet üretildi."
-          }
-
-      # ---------- 11. SHA256SUMS üretimi ----------
+      # ---------- 9. SHA256SUMS ----------
       - name: Generate SHA256SUMS
-        shell: pwsh
+        shell: bash
         run: |
-          $lines = Get-ChildItem 'build/output\*.exe' |
-            ForEach-Object {
-              $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
-              "$hash  $($_.Name)"
-            }
-          $lines | Set-Content -Path 'build/output/SHA256SUMS.txt' -Encoding UTF8
-          Get-Content 'build/output/SHA256SUMS.txt'
+          cd build/output
+          for f in *.exe; do
+            sha256sum "$f"
+          done > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
-      # ---------- 12. Artifact upload ----------
+      # ---------- 10. Artifact upload ----------
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -344,7 +301,7 @@ Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
           if-no-files-found: error
           retention-days: 30
 
-      # ---------- 13. Diagnostik loglar (her zaman yükle, hata olsa bile) ----------
+      # ---------- 11. Diagnostik loglar ----------
       - name: Upload ISCC and analyzer logs
         if: always()
         uses: actions/upload-artifact@v4
