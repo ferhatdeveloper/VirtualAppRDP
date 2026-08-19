@@ -155,12 +155,23 @@ jobs:
           chmod 777 build build/output output 2>/dev/null || true
           # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
+          # Docker container icindeki yollari test et
+          echo "=== Docker icinde /work/src test ==="
+          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
+            ls -la /work/src/inno/ 2>&1 | head -5
+          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
+            ls -la /work/src/powershell/client/ 2>&1 | head -5
+          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
+            ls -la /work/src/assets/ 2>&1 | head -5
+          docker run --rm -v "$(pwd):/work" amake/innosetup:innosetup6-bookworm \
+            ls -la /work/src/config/client/ 2>&1 | head -5
           # Önce orijinal Client.iss'i dene (root olarak ki tum dosyalari okuyabilsin)
           if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Client.iss \
                > iscc_client.log 2>&1; then
+            echo "Original Client.iss derlendi."
             echo "Original Client.iss derlendi."
             # Output dizinini build/output'a tasi (.iss'te OutputDir=output yazdik)
             if [ -d "output" ]; then
