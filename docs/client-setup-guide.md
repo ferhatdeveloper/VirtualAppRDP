@@ -215,6 +215,29 @@ Kaldırma sırasında:
 
 ---
 
+## macOS Kurulumu (Web Modu)
+
+macOS kullanıcıları için iki yol vardır:
+
+### Seçenek A: Web Modu (Kurulum gerektirmez)
+
+1. IT admin'den **RD Web** veya **Guacamole URL'sini** alın.
+2. Safari / Chrome / Firefox ile açın.
+3. Kullanıcı adı + parola ile giriş yapın.
+4. Yayınlanan uygulamaları tarayıcı sekmesinden çalıştırın.
+
+### Seçenek B: Native Client (SwiftUI DMG)
+
+1. `RdpVirtualBoxApp-Client-vX.X.X.dmg` dosyasını indirin.
+2. Çift tıklayıp `Rdp Virtual Box App.app` bundle'ını **Applications** klasörüne sürükleyin.
+3. **App Store → Microsoft Remote Desktop** uygulamasını yükleyin.
+4. `Rdp Virtual Box App` uygulamasını ilk kez açarken "Open" ile Gatekeeper uyarısını geçin.
+5. 4 adımlı SwiftUI sihirbazını takip edin (Windows sihirbazıyla aynı adımlar).
+
+Detaylı bilgi için: [macos-setup-guide.md](macos-setup-guide.md)
+
+---
+
 ## Sorun Giderme
 
 Yaygın hatalar ve çözümleri için: [troubleshooting.md](troubleshooting.md)

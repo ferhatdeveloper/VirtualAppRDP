@@ -27,11 +27,42 @@ Bu belge, **Rdp Virtual Box App — Client Setup** EXE'sini çalıştırmadan ö
 
 > **Önemli:** Windows 10 1809 öncesi sürümlerde RemoteApp `remoteapplicationprogram:s:||alias` parametre düzgün çalışmaz.
 
-### macOS / Linux
+### macOS
 
-**Resmi olarak desteklenmiyor.** Ürün yalnızca Windows RDP client'larını hedefler. Ancak:
-- `.rdp` dosyaları Microsoft Remote Desktop (macOS) veya FreeRDP ile açılabilir (sınırlı test).
-- Web modu (RD Web veya Guacamole) modern tarayıcılarla her platformda çalışır.
+**Resmi olarak desteklenir** (1.1.0+). İki seçenek mevcuttur:
+
+| Yöntem | Uygulama | Bağlantı Tipi |
+|---|---|---|
+| **Web Modu** | Safari / Chrome / Firefox | RD Web Access veya Apache Guacamole üzerinden HTML5 |
+| **Native Client** | `RdpVirtualBoxApp-Client.dmg` (SwiftUI) | Microsoft Remote Desktop.app ile `.rdp` veya `rdp://` URL'si |
+
+| macOS Sürümü | Minimum Build | Önerilen |
+|---|---|---|
+| **macOS Sonoma** | 14.0 | 14.5+ |
+| **macOS Ventura** | 13.0 | 13.6+ |
+| **macOS Monterey** | 12.0 | 12.7+ |
+
+#### Web Modu (Tavsiye Edilen)
+
+Modern tarayıcı üzerinden RD Web Access veya Guacamole'a bağlanır. Kurulum gerektirmez.
+
+#### Native Client (SwiftUI)
+
+`RdpVirtualBoxApp-Client-vX.X.X.dmg` dosyasını indirin ve `Applications` klasörüne sürükleyin. Sihirbaz `.rdp` dosyaları üretir ve bunları Microsoft Remote Desktop.app ile açar. **Microsoft Remote Desktop** App Store'dan ücretsiz yüklenmelidir.
+
+#### Bağımlılıklar
+
+| Bileşen | Yükleme |
+|---|---|
+| **macOS 12+** | Sistem güncellemesi |
+| **Microsoft Remote Desktop** | App Store → "Microsoft Remote Desktop" |
+| **Xcode Command Line Tools** | `xcode-select --install` (yalnızca DMG build için; son kullanıcı gerektirmez) |
+
+### Linux
+
+**Resmi olarak desteklenmiyor.** Ancak:
+- `.rdp` dosyaları FreeRDP (`xfreerdp`) ile açılabilir.
+- Web modu modern tarayıcılarla çalışır.
 
 ---
 
