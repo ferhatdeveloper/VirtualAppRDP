@@ -56,46 +56,8 @@ jobs:
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Client.iss 2>&1 | tail -20; then
-            echo "Original Client.iss FAILED, minimal fallback yaziliyor..."
-            cat > build/client.iss <<'EOF'
-[Setup]
-AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
-AppName=Rdp Virtual Box App
-AppVersion=1.0.0
-AppVerName=Rdp Virtual Box App 1.0.0
-AppPublisher=Rdp Virtual Box App
-DefaultDirName={autopf}\RdpVirtualBoxApp
-DefaultGroupName=Rdp Virtual Box App
-DisableProgramGroupPage=yes
-AllowNoIcons=yes
-WizardStyle=modern
-WizardSizePercent=120
-PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
-MinVersion=10.0
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=build/output
-OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
-Compression=lzma2/ultra64
-SolidCompression=yes
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-[Tasks]
-Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
-[Files]
-Source: "src/powershell/client/*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/config/client/*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/assets/*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
-[Dirs]
-Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
-Name: "{userlocalappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
-[Icons]
-Name: "{group}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"
-Name: "{group}\Uninstall Rdp Virtual Box App"; Filename: "{uninstallexe}"
-[Run]
-Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch"; Flags: nowait postinstall skipifsilent
-EOF
+            echo "Original Client.iss FAILED, fallback kullaniliyor: .github/fallback-iss/client.iss"
+            cp .github/fallback-iss/client.iss build/client.iss
             chmod 777 build/client.iss
             docker run --rm -i --user 1000:1000 \
               -v "$(pwd):/work" \
@@ -114,46 +76,8 @@ EOF
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Server.iss 2>&1 | tail -20; then
-            echo "Original Server.iss FAILED, minimal fallback yaziliyor..."
-            cat > build/server.iss <<'EOF'
-[Setup]
-AppId=8B6A8C2D-1234-5678-9012-RDPVB-SERVER1
-AppName=Rdp Virtual Box App - Server
-AppVersion=1.0.0
-AppVerName=Rdp Virtual Box App - Server 1.0.0
-AppPublisher=ferhatdeveloper
-DefaultDirName={autopf}\RdpVirtualBoxApp
-DefaultGroupName=Rdp Virtual Box App - Server
-DisableProgramGroupPage=yes
-AllowNoIcons=yes
-WizardStyle=modern
-WizardSizePercent=120
-PrivilegesRequired=admin
-MinVersion=10.0
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=build/output
-OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
-Compression=lzma2/ultra64
-SolidCompression=yes
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-[Tasks]
-Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
-[Files]
-Source: "src/powershell/server/*.ps1"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/config/server/*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/assets/server/*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "src/assets/icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
-[Dirs]
-Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
-[Icons]
-Name: "{group}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"
-Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
-[Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; Description: "Launch Server Setup"; Flags: nowait postinstall skipifsilent
-EOF
+            echo "Original Server.iss FAILED, fallback kullaniliyor: .github/fallback-iss/server.iss"
+            cp .github/fallback-iss/server.iss build/server.iss
             chmod 777 build/server.iss
             docker run --rm -i --user 1000:1000 \
               -v "$(pwd):/work" \

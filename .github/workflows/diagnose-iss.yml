@@ -32,24 +32,10 @@ jobs:
           Write-Host "ISCC: $isccVersion"
           Write-Host "---"
 
-          # Minimal test script
-          @"
-[Setup]
-AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
-AppName=Test
-AppVersion=1.0.0
-AppVerName=Test 1.0.0
-DefaultDirName={autopf}\Test
-DefaultGroupName=Test
-DisableProgramGroupPage=yes
-OutputDir=build\output
-OutputBaseFilename=TestMinimal
-Compression=lzma2/ultra64
-[Files]
-[Icons]
-"@ | Set-Content -Path "minimal.iss" -Encoding UTF8
+          # Minimal test script (harici fallback dosyadan kopyalanir)
+          Copy-Item .github/fallback-iss/minimal.iss minimal.iss -Force
 
-          Write-Host "minimal.iss dosyasi olusturuldu. ISCC cagiriliyor..."
+          Write-Host "minimal.iss dosyasi hazir. ISCC cagiriliyor..."
           & $isccPath minimal.iss
           Write-Host "Exit: $LASTEXITCODE"
 
