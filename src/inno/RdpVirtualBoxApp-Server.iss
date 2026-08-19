@@ -1,4 +1,4 @@
-; =============================================================================
+﻿; =============================================================================
 ;  RdpVirtualBoxApp-Server.iss
 ;  Inno Setup Script - Server-Side Installer
 ;  Product: Rdp Virtual Box App - Server
@@ -38,28 +38,32 @@ AllowNoIcons=yes
 ; Modern wizard look & feel
 WizardStyle=modern
 WizardSizePercent=120
-; Compression: lzma2 / ultra64
+; Compression: lzma2 / ultra (no extra LZMA threads — avoids OOM on CI)
 Compression=lzma2/ultra
 SolidCompression=yes
-LZMAUseSeparateProcess=yes
-LZMANumBlockThreads=8
-; Visual assets (placeholders - swap when real art is available)
-SetupIconFile=Z:\work\src\assets\icon.ico
-WizardSmallImageFile=Z:\work\src\assets\server\server-wizard.bmp
-WizardImageFile=Z:\work\src\assets\server\server-banner.bmp
+; Visual assets
+SetupIconFile=src\assets\icon.ico
+WizardSmallImageFile=src\assets\server\server-wizard.bmp
+WizardImageFile=src\assets\server\server-banner.bmp
 ; Uninstaller
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\Assets\icon.ico
 UninstallDisplayName={#MyAppName}
-; Output
-OutputDir=Z:\work\build\output
+; Paths are relative to the repository root (this script lives in src\inno).
+SourceDir=..\..
+OutputDir=build\output
 OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.1
+VersionInfoVersion=1.0.1.0
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} Setup
+VersionInfoProductName={#MyAppName}
+VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
 ; Misc
 AppMutex=RdpVirtualBoxApp-Server-Setup-Mutex
 ; Min Windows version: Windows Server 2016 / Windows 10 1607
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-LicenseFile=Z:\work\LICENSE
+LicenseFile=LICENSE
 
 [Languages]
 Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
@@ -70,17 +74,14 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; PowerShell modules (Server-side)
-Source: "Z:\work\src\powershell\server\*.ps1";                   DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src\powershell\server\*"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Config templates
-Source: "Z:\work\src\config\server\*";                           DestDir: "{app}\Config";    Flags: ignoreversion recursesubdirs createallsubdirs
-; Server assets (banners, icons)
-Source: "Z:\work\src\assets\server\*";                           DestDir: "{app}\Assets";    Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "Z:\work\src\assets\icon.ico";                           DestDir: "{app}\Assets";    Flags: ignoreversion
-; Inno assets (so the wizard image sources are present at runtime too)
-Source: "Z:\work\src\assets\server\server-wizard.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
-Source: "Z:\work\src\assets\server\server-banner.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
-; Optional helper scripts (Launch helper + README placeholder)
-Source: "Z:\work\src\powershell\server\ServerSetupUI.ps1";       DestDir: "{app}";           Flags: ignoreversion
+Source: "src\config\server\*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Server assets (icon + wizard / banner bitmaps)
+Source: "src\assets\icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
+Source: "src\assets\server\*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Launch helper at {app} so {app}\ServerSetupUI.ps1 matches shortcut / [Run] paths
+Source: "src\powershell\server\ServerSetupUI.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 Name: "{commonappdata}\RdpVirtualBoxApp";        Permissions: users-modify
@@ -90,16 +91,16 @@ Name: "{commonappdata}\RdpVirtualBoxApp\Manifest";Permissions: users-modify
 
 [Icons]
 ; Start Menu shortcuts
-Name: "{group}\{#MyAppName}";                   Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; IconFilename: "{app}\Assets\icon.ico"; Comment: "Rdp Virtual Box App - Server Kurulum Sihirbazi"
+Name: "{group}\{#MyAppName}";                   Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; WorkingDir: "{app}"; IconFilename: "{app}\Assets\icon.ico"; Comment: "Rdp Virtual Box App - Server Kurulum Sihirbazi"
 Name: "{group}\Sunucu Klasoru";                 Filename: "{app}";            IconFilename: "{app}\Assets\icon.ico"; Comment: "Kurulan sunucu dosyalari"
 Name: "{group}\Log Dosyalari";                  Filename: "{commonappdata}\RdpVirtualBoxApp\Logs"; Comment: "Kurulum log dosyalari"
 Name: "{group}\Yardim / GitHub";                Filename: "{#MyAppURL}";      Comment: "Proje sayfasi"
 ; Desktop shortcut (optional task)
-Name: "{autodesktop}\{#MyAppName}";              Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; IconFilename: "{app}\Assets\icon.ico"; Comment: "Rdp Virtual Box App - Server Kurulum"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}";              Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; WorkingDir: "{app}"; IconFilename: "{app}\Assets\icon.ico"; Comment: "Rdp Virtual Box App - Server Kurulum"; Tasks: desktopicon
 
 [Run]
 ; Optionally launch the wizard elevated at the end of installation
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; Description: "{cm:LaunchProgram},{#MyAppName}"; Flags: nowait postinstall skipifsilent runhidden
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent runhidden
 
 [UninstallDelete]
 ; Optional: clean up %ProgramData%\RdpVirtualBoxApp entirely on uninstall.
@@ -149,7 +150,7 @@ begin
   begin
     // Touch a marker file so the wizard knows install completed cleanly
     InstalledVersion := ExpandConstant('{#MyAppVersion}');
-    InstalledDate    := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now);
+    InstalledDate    := GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':');
     SaveStringToFile(ExpandConstant('{commonappdata}\RdpVirtualBoxApp\installed.marker'),
                      'RdpVirtualBoxApp Server v' + InstalledVersion + ' installed on ' + InstalledDate,
                      False);
@@ -157,13 +158,17 @@ begin
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+  Cleanup: String;
 begin
   if CurUninstallStep = usUninstall then
   begin
     // Optional: invoke a PowerShell cleanup script if the server modules
     // expose one. We keep it best-effort and never fail uninstall.
+    Cleanup := ExpandConstant('{app}\PowerShell\Uninstall-Cleanup.ps1');
     Exec('powershell.exe',
-         '-NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path ''{app}\PowerShell\Uninstall-Cleanup.ps1'') { & ''{app}\PowerShell\Uninstall-Cleanup.ps1'' | Out-Null }"',
+         '-NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path ''' + Cleanup + ''') { & ''' + Cleanup + ''' | Out-Null }"',
          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
@@ -176,11 +181,17 @@ begin
 end;
 
 [Messages]
-; Custom Turkish messages for better localization of standard wizard pages.
-WelcomeLabel2=Bu sihirbaz [name/] uygulamasini bilgisayariniza kuracak.[br][br]Server kurulumu icin yonetici haklari gereklidir. Devam etmek icin Ileri''ye tiklayin.
-SelectDirLabel=Kurulum dizinini secin
-SelectGroupLabel=Start Menu klasorunu secin
-FinishedLabelLabel=[name] bilgisayariniza kuruldu. Uygulama Start Menu uzerinden baslatilabilir.
+english.BeveledLabel=This wizard installs {#MyAppName} on your computer.
+english.SetupWindowTitle={#MyAppName} Setup
+english.WelcomeLabel2=This will install [name] on your computer.[br][br]Administrator rights are required for the server setup. Click Next to continue.
+english.FinishedHeadingLabel=Installation Complete
+english.FinishedLabel=[name] has been installed on your computer.[br][br]You can start it from the Start Menu.[br][br]Click Finish to close this wizard.
+
+turkish.BeveledLabel=Bu sihirbaz, {#MyAppName} uygulamasını bilgisayarınıza kurar.
+turkish.SetupWindowTitle={#MyAppName} Kurulumu
+turkish.WelcomeLabel2=Bu sihirbaz [name] uygulamasını bilgisayarınıza kuracak.[br][br]Server kurulumu için yönetici hakları gereklidir. Devam etmek için İleri'ye tıklayın.
+turkish.FinishedHeadingLabel=Kurulum Tamamlandı
+turkish.FinishedLabel=[name] bilgisayarınıza kuruldu.[br][br]Uygulama Start Menu üzerinden başlatılabilir.[br][br]Kurulum sihirbazını kapatmak için Son'a tıklayın.
 
 [CustomMessages]
 ; Custom Turkish strings referenced from above sections

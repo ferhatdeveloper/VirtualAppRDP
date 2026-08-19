@@ -50,10 +50,7 @@ let package = Package(
         .testTarget(
             name: "RdpVirtualBoxAppTests",
             dependencies: ["RdpVirtualBoxAppCore"],
-            path: "Tests/RdpVirtualBoxAppTests",
-            resources: [
-                .process("Fixtures")
-            ]
+            path: "Tests/RdpVirtualBoxAppTests"
         )
     ]
 )

@@ -32,27 +32,42 @@ jobs:
           Write-Host "ISCC: $isccVersion"
           Write-Host "---"
 
-          # Minimal test script (harici fallback dosyadan kopyalanir)
           Copy-Item .github/fallback-iss/minimal.iss minimal.iss -Force
 
           Write-Host "minimal.iss dosyasi hazir. ISCC cagiriliyor..."
           & $isccPath minimal.iss
           Write-Host "Exit: $LASTEXITCODE"
+          if ($LASTEXITCODE -ne 0) {
+            throw "ISCC failed for minimal.iss with exit code $LASTEXITCODE"
+          }
 
-      - name: Run ISCC on actual Client.iss with verbose log
+      - name: Run ISCC on actual Client.iss
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           Write-Host "=== RdpVirtualBoxApp-Client.iss (raw) ==="
           Get-Content "src\inno\RdpVirtualBoxApp-Client.iss" | Out-Host
           Write-Host "==="
-          Write-Host "Calling ISCC with /O- (no output) for full diagnostics..."
-          & $isccPath /O- "src\inno\RdpVirtualBoxApp-Client.iss" 2>&1 | ForEach-Object { Write-Host "ISCC: $_" }
-          Write-Host "Exit code: $LASTEXITCODE"
-          if ($LASTEXITCODE -ne 0) {
-            # Try to find log file
-            Get-ChildItem -Recurse -Filter "*.txt" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+
+          New-Item -ItemType Directory -Force -Path 'build\output' | Out-Null
+          $outDir = (Resolve-Path -LiteralPath 'build\output').Path
+
+          Write-Host "Calling ISCC (real compile, OutputDir=$outDir)..."
+          & $isccPath "/O$outDir" "src\inno\RdpVirtualBoxApp-Client.iss"
+          $code = $LASTEXITCODE
+          Write-Host "Exit code: $code"
+          if ($code -ne 0) {
+            Get-ChildItem -Recurse -Filter "*.txt" -ErrorAction SilentlyContinue |
+              ForEach-Object { Write-Host "Found: $($_.FullName)" }
+            throw "ISCC failed for RdpVirtualBoxApp-Client.iss with exit code $code"
           }
+
+          $exe = @(Get-ChildItem -Path $outDir -Filter '*Client*.exe' -ErrorAction SilentlyContinue)
+          if ($exe.Count -eq 0) {
+            throw "ISCC succeeded but no Client EXE in $outDir"
+          }
+          $exe | ForEach-Object { Write-Host ("Produced: {0} ({1} bytes)" -f $_.Name, $_.Length) }
 
       - name: Upload logs
         if: always()
@@ -62,4 +77,5 @@ jobs:
           path: |
             iscc_*.log
             minimal.iss
+            build/output/*Client*.exe
           if-no-files-found: ignore

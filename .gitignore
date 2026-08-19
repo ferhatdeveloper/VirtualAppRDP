@@ -6,6 +6,9 @@
 build/
 build/output/
 .build/
+# macOS DMG helper lives in src/swift/.../build/ — keep that tree tracked
+!src/swift/RdpVirtualBoxApp/build/
+!src/swift/RdpVirtualBoxApp/build/**
 *.xcodeproj/
 *.exe
 *.msi

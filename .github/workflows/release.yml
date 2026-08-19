@@ -1,14 +1,14 @@
 # ===============================================
 # Rdp Virtual Box App — Release Workflow
 # ===============================================
-# Tetikleyici:
-#   - "v*" pattern'ine uyan tag push'ları (örn. v1.0.0)
-# Davranış:
-#   1. Build job'unu çalıştırır (artifacts hazır)
-#   2. Build artifacts'ı indirir
-#   3. GitHub Releases üzerinde DRAFT bir release oluşturur
-#   4. Client + Server .exe + SHA256SUMS dosyalarını yükler
-#   5. Otomatik release notes üretir
+# Triggers:
+#   - tag push matching v* (e.g. v1.0.1)
+#   - workflow_dispatch (manual)
+#
+# Behaviour:
+#   1. Compile Client + Server setup on windows-latest with native ISCC
+#      (Chocolatey Inno Setup). Fail on nonzero ISCC. No empty fallback.
+#   2. Upload artifacts, then create a GitHub Release from dist/*
 # ===============================================
 
 name: Release
@@ -19,93 +19,93 @@ on:
       - 'v*'
   workflow_dispatch:
 
-# Aynı tag için art arda gelen run'ları iptal et
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-# Release oluşturmak için contents:write gerekli
 permissions:
   contents: write
 
 jobs:
   build:
-    # Build workflow'unu çağırıyoruz (reusable workflow olmadan
-    # tekrar tanımlamak yerine bu workflow içindeki adımları
-    # kullanmak için kendi build adımlarımızı da çalıştırıyoruz).
-    # Daha temiz yaklaşım: aşağıdaki adımları çalıştır, sonra
-    # release job'unda artifact indir.
-    #
-    # runs-on: ubuntu-latest + amake/innosetup Docker image — windows-2022
-    # incident'tan kaçınmak için.
-    name: Build Artifacts
-    runs-on: ubuntu-latest
+    name: Build Setup Executables (Windows + Inno Setup)
+    runs-on: windows-latest
     timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Client Setup via Docker Inno Setup
-        shell: bash
+      - name: Install Inno Setup
+        shell: pwsh
         run: |
-          set -e
-          mkdir -p build/output
-          chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          chmod 777 build build/output
-          if ! docker run --rm -i \
-               -v "$(pwd):/work" \
-               amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Client.iss 2>&1 | tail -20; then
-            echo "Original Client.iss FAILED, fallback kullaniliyor: .github/fallback-iss/client.iss"
-            cp .github/fallback-iss/client.iss build/client.iss
-            chmod 777 build/client.iss
-            docker run --rm -i \
-              -v "$(pwd):/work" \
-              amake/innosetup:innosetup6-bookworm \
-              build/client.iss
-          fi
-          if [ -d "Output" ]; then mv -f Output/*.exe build/output/ 2>/dev/null || true; fi
-          ls -la build/output/*.exe
+          choco install innosetup --no-progress -y
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "ISCC.exe not found at $iscc after Chocolatey install"
+          }
+          Write-Host "ISCC ready: $iscc"
 
-      - name: Build Server Setup via Docker Inno Setup
-        shell: bash
+      - name: Compile Client and Server setup (ISCC)
+        shell: pwsh
         run: |
-          set -e
-          chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          chmod 777 build build/output
-          if ! docker run --rm -i \
-               -v "$(pwd):/work" \
-               amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Server.iss 2>&1 | tail -20; then
-            echo "Original Server.iss FAILED, fallback kullaniliyor: .github/fallback-iss/server.iss"
-            cp .github/fallback-iss/server.iss build/server.iss
-            chmod 777 build/server.iss
-            docker run --rm -i \
-              -v "$(pwd):/work" \
-              amake/innosetup:innosetup6-bookworm \
-              build/server.iss
-          fi
-          if [ -d "Output" ]; then mv -f Output/*.exe build/output/ 2>/dev/null || true; fi
-          ls -la build/output/*.exe
+          $ErrorActionPreference = 'Stop'
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "ISCC.exe not found at $iscc"
+          }
 
-      - name: Generate SHA256SUMS
-        shell: bash
+          New-Item -ItemType Directory -Force -Path 'build\output' | Out-Null
+          $outDir = (Resolve-Path -LiteralPath 'build\output').Path
+          Write-Host "OutputDir override: $outDir"
+
+          $scripts = @(
+            'src\inno\RdpVirtualBoxApp-Client.iss',
+            'src\inno\RdpVirtualBoxApp-Server.iss'
+          )
+          foreach ($script in $scripts) {
+            if (-not (Test-Path -LiteralPath $script)) {
+              throw "ISS script not found: $script"
+            }
+            Write-Host "=== ISCC $script ==="
+            & $iscc "/O$outDir" $script
+            if ($LASTEXITCODE -ne 0) {
+              throw "ISCC failed for $script with exit code $LASTEXITCODE (no fallback installer)"
+            }
+            Write-Host "ISCC OK: $script"
+          }
+
+          $exes = @(Get-ChildItem -Path $outDir -Filter '*.exe' -ErrorAction SilentlyContinue)
+          if ($exes.Count -eq 0) {
+            throw "ISCC reported success but no EXE was written to $outDir"
+          }
+          $exes | ForEach-Object { Write-Host ("  {0}  {1} bytes" -f $_.Name, $_.Length) }
+
+      - name: Generate SHA256SUMS.txt
+        shell: pwsh
         run: |
-          cd build/output
-          : > SHA256SUMS.txt
-          for f in *.exe; do
-            sha256sum "$f" >> SHA256SUMS.txt
-          done
-          cat SHA256SUMS.txt
+          $ErrorActionPreference = 'Stop'
+          $outDir = 'build\output'
+          $exes = @(Get-ChildItem -Path $outDir -Filter '*.exe' | Sort-Object Name)
+          if ($exes.Count -eq 0) {
+            throw "No EXE files in $outDir to hash"
+          }
+          $lines = foreach ($f in $exes) {
+            $hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            '{0}  {1}' -f $hash, $f.Name
+          }
+          $sums = Join-Path $outDir 'SHA256SUMS.txt'
+          $lines | Set-Content -LiteralPath $sums -Encoding ascii
+          Write-Host "=== SHA256SUMS.txt ==="
+          Get-Content -LiteralPath $sums | ForEach-Object { Write-Host $_ }
 
-      - name: Upload build artifacts
+      - name: Upload Windows setup artifacts
         uses: actions/upload-artifact@v4
         with:
           name: rdp-virtual-box-app
           path: |
-            build/output/RdpVirtualBoxApp-Client-*.exe
-            build/output/RdpVirtualBoxApp-Server-*.exe
+            build/output/*Client*.exe
+            build/output/*Server*.exe
             build/output/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 90
@@ -130,9 +130,16 @@ jobs:
 
       - name: List downloaded files
         shell: bash
-        run: find dist -type f -exec ls -la {} \;
+        run: |
+          set -euo pipefail
+          find dist -type f -exec ls -la {} \;
+          count=$(find dist -type f \( -name '*Client*.exe' -o -name '*Server*.exe' \) | wc -l)
+          if [ "$count" -lt 2 ]; then
+            echo "ERROR: expected Client and Server EXEs in dist/; refusing empty fallback"
+            exit 1
+          fi
 
-      - name: Create Release (published)
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           draft: false
@@ -140,12 +147,12 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           body: |
-            ## Rdp Virtual Box App v${{ github.ref_name }}
+            ## Rdp Virtual Box App ${{ github.ref_name }}
 
             Bu sürümde iki ayrı setup bulunur:
 
-            - `RdpVirtualBoxApp-Client-v${{ github.ref_name }}.exe` — Kullanıcı tarafı kurulum (Windows 10/11)
-            - `RdpVirtualBoxApp-Server-v${{ github.ref_name }}.exe` — Sunucu tarafı kurulum (Windows Server 2016+, yönetici olarak çalıştırılmalı)
+            - `RdpVirtualBoxApp-Client-*.exe` — Kullanıcı tarafı kurulum (Windows 10/11)
+            - `RdpVirtualBoxApp-Server-*.exe` — Sunucu tarafı kurulum (Windows Server 2016+, yönetici olarak çalıştırılmalı)
 
             ### Kurulum
 
@@ -156,10 +163,8 @@ jobs:
             ### Doğrulama
 
             ```powershell
-            Get-FileHash .\RdpVirtualBoxApp-Client-v${{ github.ref_name }}.exe -Algorithm SHA256
-            Get-FileHash .\RdpVirtualBoxApp-Server-v${{ github.ref_name }}.exe -Algorithm SHA256
+            Get-FileHash .\RdpVirtualBoxApp-Client-*.exe -Algorithm SHA256
+            Get-FileHash .\RdpVirtualBoxApp-Server-*.exe -Algorithm SHA256
             ```
 
             Tüm hash'ler `SHA256SUMS.txt` içinde yer alır.
-
-            > Not: Bu bir **DRAFT** release'dir. Yayına almadan önce inceleyiniz.

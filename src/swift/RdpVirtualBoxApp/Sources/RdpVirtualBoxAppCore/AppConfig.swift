@@ -84,25 +84,22 @@ public struct ServerInfo: Codable, Equatable, Sendable {
     private static func isValidHost(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { return false }
-        // IPv4: 0-255 her octet; 1?\d?\d yalniz tek basamakli/iki basamakli ile eslesir
-        // ama "999" uc basamaga izin vermez (1?\d?\d -> max 199). Bu nedenle
-        // parcalara ayirip kontrol etmek daha guvenli.
-        let parts = trimmed.split(separator: ".")
-        if parts.count == 4 {
-            var allNumeric = true
-            var allValid = true
-            for p in parts {
-                if let n = Int(p), (0...255).contains(n) {
-                    // basinda sifir olanlar "01" gibi kabul edilmez (RFC)
-                    if p.count > 1 && p.first == "0" { allValid = false; break }
-                    _ = n
-                } else {
-                    allNumeric = false
-                    break
-                }
-            }
-            if allNumeric && allValid { return true }
+
+        // Dort nokta-ayrili tamamen sayisal octet IPv4'dur; hostname regex'ine dusulmez.
+        // Aksi halde "999.999.999.999" hostname olarak kabul edilirdi.
+        let parts = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        let isIPv4Shaped = parts.count == 4 && parts.allSatisfy { part in
+            !part.isEmpty && part.allSatisfy { $0.isASCII && $0.isNumber }
         }
+        if isIPv4Shaped {
+            for part in parts {
+                // Leading zero ("01") RFC'ye gore gecersiz
+                if part.count > 1 && part.first == "0" { return false }
+                guard let octet = Int(part), (0...255).contains(octet) else { return false }
+            }
+            return true
+        }
+
         let hostname = #"^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"#
         return trimmed.range(of: hostname, options: .regularExpression) != nil
     }

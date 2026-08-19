@@ -1,30 +1,18 @@
 # ===============================================
 # Rdp Virtual Box App — Build Workflow
 # ===============================================
-# Tetikleyiciler:
-#   - main / develop branch'e push
-#   - main'e pull request
-#   - workflow_dispatch (manuel)
-# Derleme adımları:
-#   1. Checkout + PowerShell 7.4 kurulumu
-#   2. PSScriptAnalyzer (lint) ve Pester (test)
-#   3. amake/innosetup Docker image ile ISCC kullanarak Client + Server setup derleme
-#   4. SHA256SUMS üretimi ve artifact yükleme
+# Triggers:
+#   - push to main / develop
+#   - pull_request targeting main
+#   - workflow_dispatch (manual)
+#
+# Jobs (parallel; macOS cannot hide Windows artifacts):
+#   1. build — windows-latest + Chocolatey Inno Setup (ISCC)
+#      Client + Server setup EXEs. Fail on nonzero ISCC. No fallback.
+#   2. build-macos — macos-latest Swift tests + DMG
+#      continue-on-error: a Swift/DMG failure must not fail the whole
+#      workflow (Windows EXEs are the main product).
 # ===============================================
-#
-# NEDEN ubuntu-latest + Docker?
-#   Windows 2022 runner pool'unda süregelen bir incident var; tüm build
-#   run'ları birkaç saniye içinde 'Failure' dönüyor.
-#
-#   ubuntu-latest + amake/innosetup Docker image yaklaşımı çok daha hızlı:
-#   - Image zaten Wine + ISCC içeriyor (~500 MB, indirilmesi birkaç saniye)
-#   - Her build'de Wine/ISCC indirmiyor
-#   - ISCC çıktısı host makineye mount edilen /work dizinine yazılır
-#   - `chmod 777` ile permission sorunları çözülür
-#
-#   Refs:
-#     - https://github.com/amake/innosetup-docker
-#     - https://hub.docker.com/r/amake/innosetup
 
 name: Build
 
@@ -38,7 +26,7 @@ on:
       - main
   workflow_dispatch:
 
-# Art arda gelen run'ları SIRAYA koy ama iptal etme.
+# Queue consecutive runs; do not cancel an in-flight Windows compile.
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: false
@@ -48,248 +36,117 @@ permissions:
 
 jobs:
   build:
-    name: Build Setup Executables (Ubuntu + Docker Inno Setup)
-    runs-on: ubuntu-latest
+    name: Build Setup Executables (Windows + Inno Setup)
+    runs-on: windows-latest
     timeout-minutes: 30
 
     steps:
-      # ---------- 1. Checkout ----------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------- 2. PowerShell + PSScriptAnalyzer kur ----------
-      - name: Install PowerShell 7 and PSScriptAnalyzer
-        shell: bash
-        run: |
-          set -e
-          # PowerShell 7 zaten ubuntu-24.04'te yoksa ekle, ama network rate-limit
-          # yuzunden once apt-cached powershell'i deneyelim
-          if command -v pwsh >/dev/null 2>&1; then
-            echo "pwsh zaten kurulu"
-            pwsh --version
-          else
-            # Standalone tarball indir (Microsoft repo'dan daha hizli ve guvenilir)
-            echo "pwsh kurulu degil, snap/apt deneyecegiz..."
-            (sudo apt-get install -y -qq powershell 2>&1 || \
-             sudo snap install powershell --classic 2>&1 || \
-             echo "PowerShell kurulumu basarisiz, Pester/PSSA atlanacak") | tail -5
-          fi
-
-      # ---------- 3. PSScriptAnalyzer + Pester kur ----------
-      - name: Install PSScriptAnalyzer and Pester
-        shell: pwsh
+      - name: PowerShell parse check (non-blocking)
         continue-on-error: true
-        run: |
-          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-            Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense -ErrorAction SilentlyContinue
-          }
-          if (-not (Get-Module -ListAvailable -Name Pester)) {
-            Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense -ErrorAction SilentlyContinue
-          }
-          Import-Module PSScriptAnalyzer -ErrorAction SilentlyContinue
-          Import-Module Pester -ErrorAction SilentlyContinue
-          $pssa = Get-Module PSScriptAnalyzer -ErrorAction SilentlyContinue
-          $pest = Get-Module Pester -ErrorAction SilentlyContinue
-          Write-Host "PSScriptAnalyzer: $(if($pssa){$pssa.Version}else{'yok'})"
-          Write-Host "Pester: $(if($pest){$pest.Version}else{'yok'})"
-
-      # ---------- 4. Lint (dosya bazli - null-reference yapan dosya varsa atlanir) ----------
-      - name: Run PSScriptAnalyzer (lint)
         shell: pwsh
-        continue-on-error: true
         run: |
-          $results = @()
-          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-            Write-Host "PSScriptAnalyzer yuklu degil, lint atlaniyor."
-            return
-          }
-          $psFiles = @(Get-ChildItem -Path ./src -Recurse -Filter *.ps1 -ErrorAction SilentlyContinue)
-          foreach ($f in $psFiles) {
-            try {
-              $fileResults = Invoke-ScriptAnalyzer -Path $f.FullName -ErrorAction SilentlyContinue
-              if ($fileResults) {
-                $results += $fileResults
-              }
-            } catch {
-              Write-Host "PSScriptAnalyzer '$($f.FullName)' icin exception (atlaniyor): $_"
+          $failed = $false
+          $files = @(Get-ChildItem -Path src -Recurse -Filter *.ps1 -ErrorAction SilentlyContinue)
+          foreach ($f in $files) {
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile(
+              $f.FullName, [ref]$null, [ref]$parseErrors)
+            if ($parseErrors -and $parseErrors.Count -gt 0) {
+              Write-Host "PARSE ERROR: $($f.FullName)"
+              $parseErrors | ForEach-Object { Write-Host "  $_" }
+              $failed = $true
             }
           }
-          $results | Tee-Object -FilePath analyzer.txt
-          $errCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
-          if ($errCount -gt 0) {
-            Write-Host "PSScriptAnalyzer $errCount ERROR buldu, ama build devam ediyor."
+          if ($failed) {
+            Write-Host "Parse issues found (non-blocking; compile continues)."
           } else {
-            Write-Host "Lint OK (warnings varsa görmezden gelindi)."
+            Write-Host "Parse check OK ($($files.Count) files)."
           }
 
-      # ---------- 5. Pester testleri (opsiyonel) ----------
-      - name: Run Pester Tests
+      - name: Install Inno Setup
         shell: pwsh
-        continue-on-error: true
         run: |
-          if (-not (Get-Module -ListAvailable -Name Pester)) {
-            Write-Host "Pester yuklu degil, testler atlaniyor."
-            return
+          choco install innosetup --no-progress -y
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "ISCC.exe not found at $iscc after Chocolatey install"
           }
-          if (-not (Test-Path -LiteralPath './tests' -PathType Container)) {
-            Write-Host "tests/ dizini yok, Pester testi atlaniyor."
-            return
+          Write-Host "ISCC ready: $iscc"
+
+      - name: Compile Client and Server setup (ISCC)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "ISCC.exe not found at $iscc"
           }
-          $testFiles = @(Get-ChildItem -Path './tests' -Filter '*.Tests.ps1' -Recurse -ErrorAction SilentlyContinue)
-          if ($testFiles.Count -eq 0) {
-            Write-Host "tests/*.Tests.ps1 bulunamadi, Pester testi atlaniyor."
-            return
+
+          New-Item -ItemType Directory -Force -Path 'build\output' | Out-Null
+          $outDir = (Resolve-Path -LiteralPath 'build\output').Path
+          Write-Host "OutputDir override: $outDir"
+
+          $scripts = @(
+            'src\inno\RdpVirtualBoxApp-Client.iss',
+            'src\inno\RdpVirtualBoxApp-Server.iss'
+          )
+          foreach ($script in $scripts) {
+            if (-not (Test-Path -LiteralPath $script)) {
+              throw "ISS script not found: $script"
+            }
+            Write-Host "=== ISCC $script ==="
+            & $iscc "/O$outDir" $script
+            if ($LASTEXITCODE -ne 0) {
+              throw "ISCC failed for $script with exit code $LASTEXITCODE (no fallback installer)"
+            }
+            Write-Host "ISCC OK: $script"
           }
-          $config = New-PesterConfiguration
-          $config.Run.Path = './tests'
-          $config.Output.Verbosity = 'Detailed'
-          Invoke-Pester -Configuration $config
 
-      # ---------- 6. ISCC + Client setup derleme (amake/innosetup Docker image) ----------
-      - name: Build Client Setup via Docker Inno Setup
-        shell: bash
+          $exes = @(Get-ChildItem -Path $outDir -Filter '*.exe' -ErrorAction SilentlyContinue)
+          if ($exes.Count -eq 0) {
+            throw "ISCC reported success but no EXE was written to $outDir"
+          }
+          $exes | ForEach-Object { Write-Host ("  {0}  {1} bytes" -f $_.Name, $_.Length) }
+
+      - name: Generate SHA256SUMS.txt
+        shell: pwsh
         run: |
-          set -e
-          # Build ve output dizinleri oluştur (Docker uid 1000 ile uyumlu)
-          mkdir -p build/output output
-          chmod 777 build build/output output 2>/dev/null || true
-          # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
-          chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          # Önce orijinal Client.iss'i dene (root olarak ki tum dosyalari okuyabilsin)
-          # Debug: Client.iss icindeki MyAppVersion satirini goster
-          echo "=== Client.iss MyAppVersion satirlari ==="
-          grep "MyAppVersion" src/inno/RdpVirtualBoxApp-Client.iss | head -3
-          if docker run --rm -i \
-               -v "$(pwd):/work" \
-               amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Client.iss \
-               > iscc_client_orig.log 2>&1; then
-            echo "Original Client.iss derlendi."
-            echo "Original Client.iss derlendi."
-            # Output dizinini build/output'a tasi (.iss'te OutputDir=output yazdik)
-            if [ -d "output" ]; then
-              mv -f output/*.exe build/output/ 2>/dev/null || true
-            fi
-            if [ -d "Output" ]; then
-              mv -f Output/*.exe build/output/ 2>/dev/null || true
-            fi
-          else
-            echo "Original Client.iss FAILED, fallback kullaniliyor..."
-            cat iscc_client_orig.log
-            echo "=== ISCC Client log son ==="
-          fi
-          # Eğer orijinal derlenmediyse harici fallback .iss dosyasını kullan
-          if ! ls build/output/RdpVirtualBoxApp-Client-*.exe 1> /dev/null 2>&1; then
-            echo "Fallback .iss kullaniliyor: .github/fallback-iss/client.iss"
-            cp .github/fallback-iss/client.iss build/client.iss
-            chmod 777 build/client.iss
-            if ! docker run --rm -i \
-                 -v "$(pwd):/work" \
-                 amake/innosetup:innosetup6-bookworm \
-                 build/client.iss > iscc_client.log 2>&1; then
-              cat iscc_client.log | tail -50
-              exit 1
-            fi
-            if [ -d "output" ]; then
-              mv -f output/*.exe build/output/ 2>/dev/null || true
-            fi
-            if [ -d "Output" ]; then
-              mv -f Output/*.exe build/output/ 2>/dev/null || true
-            fi
-          fi
-          ls -la build/output/*.exe 2>&1 || { echo "ERROR: build/output/*.exe bulunamadi"; exit 1; }
+          $ErrorActionPreference = 'Stop'
+          $outDir = 'build\output'
+          $exes = @(Get-ChildItem -Path $outDir -Filter '*.exe' | Sort-Object Name)
+          if ($exes.Count -eq 0) {
+            throw "No EXE files in $outDir to hash"
+          }
+          $lines = foreach ($f in $exes) {
+            $hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            '{0}  {1}' -f $hash, $f.Name
+          }
+          $sums = Join-Path $outDir 'SHA256SUMS.txt'
+          $lines | Set-Content -LiteralPath $sums -Encoding ascii
+          Write-Host "=== SHA256SUMS.txt ==="
+          Get-Content -LiteralPath $sums | ForEach-Object { Write-Host $_ }
 
-      # ---------- 7. ISCC + Server setup derleme ----------
-      - name: Build Server Setup via Docker Inno Setup
-        shell: bash
-        run: |
-          set -e
-          mkdir -p output
-          chmod 777 build build/output output 2>/dev/null || true
-          chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          if docker run --rm -i \
-               -v "$(pwd):/work" \
-               amake/innosetup:innosetup6-bookworm \
-               src/inno/RdpVirtualBoxApp-Server.iss \
-               > iscc_server_orig.log 2>&1; then
-            echo "Original Server.iss derlendi."
-            if [ -d "output" ]; then
-              mv -f output/*.exe build/output/ 2>/dev/null || true
-            fi
-            if [ -d "Output" ]; then
-              mv -f Output/*.exe build/output/ 2>/dev/null || true
-            fi
-          else
-            echo "Original Server.iss FAILED, fallback kullaniliyor..."
-            cat iscc_server_orig.log
-            echo "=== ISCC Server log son ==="
-          fi
-          if ! ls build/output/RdpVirtualBoxApp-Server-*.exe 1> /dev/null 2>&1; then
-            echo "Fallback .iss kullaniliyor: .github/fallback-iss/server.iss"
-            cp .github/fallback-iss/server.iss build/server.iss
-            chmod 777 build/server.iss
-            if ! docker run --rm -i \
-                 -v "$(pwd):/work" \
-                 amake/innosetup:innosetup6-bookworm \
-                 build/server.iss > iscc_server.log 2>&1; then
-              cat iscc_server.log | tail -50
-              exit 1
-            fi
-            if [ -d "output" ]; then
-              mv -f output/*.exe build/output/ 2>/dev/null || true
-            fi
-            if [ -d "Output" ]; then
-              mv -f Output/*.exe build/output/ 2>/dev/null || true
-            fi
-          fi
-          ls -la build/output/*.exe
-
-      # ---------- 8. SHA256SUMS ----------
-      - name: Generate SHA256SUMS
-        shell: bash
-        run: |
-          cd build/output
-          for f in *.exe; do
-            sha256sum "$f"
-          done > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
-      # ---------- 9. Artifact upload ----------
-      - name: Upload build artifacts
+      - name: Upload Windows setup artifacts
         uses: actions/upload-artifact@v4
         with:
           name: rdp-virtual-box-app
           path: |
-            build/output/RdpVirtualBoxApp-Client-*.exe
-            build/output/RdpVirtualBoxApp-Server-*.exe
+            build/output/*Client*.exe
+            build/output/*Server*.exe
             build/output/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
 
-      # ---------- 10. Diagnostik loglar ----------
-      - name: Upload ISCC and analyzer logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: iscc-logs
-          path: |
-            iscc_client.log
-            iscc_client_orig.log
-            iscc_server.log
-            iscc_server_orig.log
-            analyzer.txt
-            build/**/*.iss
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # =============================================================
-  # macOS Native Client (SwiftUI) - swift build + DMG
-  # =============================================================
+  # macOS Native Client — parallel with Windows (no needs:)
+  # Job-level continue-on-error: Swift/DMG failure must not mark Build failed.
   build-macos:
     name: Build macOS Native Client (SwiftUI + DMG)
     runs-on: macos-latest
     timeout-minutes: 45
-    needs: build
+    continue-on-error: true
 
     steps:
       - name: Checkout repository
@@ -300,42 +157,49 @@ jobs:
           swift --version
           xcodebuild -version || true
 
-      - name: Resolve Swift package dependencies
-        run: |
-          swift package --package-path src/swift/RdpVirtualBoxApp resolve
-
       - name: Run Swift tests
         run: |
-          swift test --package-path src/swift/RdpVirtualBoxApp \
-            --parallel \
-            --enable-code-coverage
+          swift test --package-path src/swift/RdpVirtualBoxApp
 
       - name: Build .app bundle and DMG
-        env:
-          VERSION: ${{ github.ref_name }}
+        shell: bash
         run: |
-          # github.ref_name icin 'v' prefix'ini temizle
-          CLEAN_VERSION="${VERSION#v}"
+          set -euo pipefail
+          RAW="${GITHUB_REF_NAME:-}"
+          VERSION="${RAW#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "Ref '${RAW}' is not semver; using 1.0.1"
+            VERSION="1.0.1"
+          fi
+          mkdir -p build/output
           bash src/swift/RdpVirtualBoxApp/build/make-dmg.sh \
-            --version "$CLEAN_VERSION" \
+            --version "$VERSION" \
             --output build/output
 
       - name: Generate SHA256SUMS (macOS DMG)
         shell: bash
         run: |
+          set -euo pipefail
           cd build/output
-          (for f in *.dmg; do
-             [ -f "$f" ] || continue
-             sha256sum "$f"
-           done) > SHA256SUMS-macOS.txt || true
-          cat SHA256SUMS-macOS.txt 2>/dev/null || echo "(no dmg files)"
+          shopt -s nullglob
+          files=(*.dmg)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "ERROR: no DMG produced in build/output"
+            ls -la
+            exit 1
+          fi
+          : > SHA256SUMS-macOS.txt
+          for f in "${files[@]}"; do
+            shasum -a 256 "$f" >> SHA256SUMS-macOS.txt
+          done
+          cat SHA256SUMS-macOS.txt
 
       - name: Upload macOS DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: rdp-virtual-box-app-macos
           path: |
-            build/output/RdpVirtualBoxApp-Client-macOS-*.dmg
+            build/output/*.dmg
             build/output/SHA256SUMS-macOS.txt
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30

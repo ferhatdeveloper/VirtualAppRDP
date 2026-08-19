@@ -1,4 +1,4 @@
-; =====================================================================
+﻿; =====================================================================
 ;  RdpVirtualBoxApp-Client.iss
 ;  Inno Setup script for the CLIENT setup of "Rdp Virtual Box App".
 ;
@@ -9,7 +9,7 @@
 ;  wizard is launched.
 ;
 ;  Build: ISCC.exe RdpVirtualBoxApp-Client.iss
-;  Output: build\output\RdpVirtualBoxApp-Client-v1.0.0.exe (~5-8 MB)
+;  Output: build\output\RdpVirtualBoxApp-Client-v1.0.1.exe
 ; =====================================================================
 
 #define MyAppName            "Rdp Virtual Box App"
@@ -45,7 +45,6 @@ DisableProgramGroupPage=yes
 AllowNoIcons=yes
 WizardStyle=modern
 WizardSizePercent=120
-WindowVisible=no
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
@@ -56,10 +55,11 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
-; Output (CI uses ISCC default ./Output; the workflow moves it)
-OutputDir=Z:\work\build\output
+; Paths are relative to the repository root (this script lives in src\inno).
+SourceDir=..\..
+OutputDir=build\output
 OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.1
-SetupIconFile=Z:\work\src\assets\icon.ico
+SetupIconFile=src\assets\icon.ico
 UninstallDisplayIcon={app}\assets\icon.ico
 UninstallDisplayName={#MyAppName}
 
@@ -68,8 +68,8 @@ Compression=lzma2/ultra
 SolidCompression=yes
 
 ; Optional licence / version metadata
-LicenseFile=Z:\work\LICENSE
-VersionInfoVersion={#MyAppVersion}.0
+LicenseFile=LICENSE
+VersionInfoVersion=1.0.1.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Client Setup
 VersionInfoProductName={#MyAppName} Client
@@ -87,13 +87,13 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; PowerShell wizard and helper modules
-Source: "Z:\work\src\powershell\client\*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src\powershell\client\*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Configuration templates (apps, rdp, web)
-Source: "Z:\work\src\config\client\*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src\config\client\*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Icons, banner, wizard images
-Source: "Z:\work\src\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src\assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]
 ; Per-user working folders created up-front so the wizard can write to them.
@@ -103,18 +103,18 @@ Name: "{userdocs}\{#MyAppShortName}"; Permissions: users-modify
 
 [Icons]
 ; Start Menu shortcuts
-Name: "{group}\{#MyAppName} Setup"; Filename: "{app}\powershell\{#MyAppExeName}"; Comment: "{cm:LaunchSetupComment}"; IconFilename: "{app}\assets\icon.ico"
-Name: "{group}\{#MyAppName} README"; Filename: "{app}\assets\README.url"; Tasks: ; IconFilename: "{app}\assets\icon.ico"
+Name: "{group}\{#MyAppName} Setup"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\powershell\{#MyAppExeName}"""; WorkingDir: "{app}"; Comment: "{cm:LaunchSetupComment}"; IconFilename: "{app}\assets\icon.ico"
+Name: "{group}\{#MyAppName} README"; Filename: "{app}\assets\README.url"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\icon.ico"
 
 ; Quick Launch
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppShortName}"; Filename: "{app}\powershell\{#MyAppExeName}"; Tasks: ; IconFilename: "{app}\assets\icon.ico"; Comment: "{cm:LaunchSetupComment}"
+Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppShortName}"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\powershell\{#MyAppExeName}"""; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"; Comment: "{cm:LaunchSetupComment}"
 
 ; Optional desktop shortcut
-Name: "{autodesktop}\{#MyAppName} Setup"; Filename: "{app}\powershell\{#MyAppExeName}"; Tasks: desktopicon; IconFilename: "{app}\assets\icon.ico"
+Name: "{autodesktop}\{#MyAppName} Setup"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\powershell\{#MyAppExeName}"""; WorkingDir: "{app}"; Tasks: desktopicon; IconFilename: "{app}\assets\icon.ico"
 
 [Run]
-Filename: "{app}\powershell\{#MyAppExeName}"; Description: "{cm:LaunchSetup}"; Flags: nowait postinstall skipifsilent runhidden; Parameters: "-ExecutionPolicy Bypass -File ""{app}\powershell\{#MyAppExeName}"""
+Filename: "powershell.exe"; Description: "{cm:LaunchSetup}"; Flags: nowait postinstall skipifsilent runhidden; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\powershell\{#MyAppExeName}"""; WorkingDir: "{app}"
 
 [UninstallDelete]
 ; Per-user data and logs
@@ -125,33 +125,21 @@ Type: filesandordirs; Name: "{userdocs}\{#MyAppShortName}"
 ; Not: Registry key kaldirma [Registry] section'inda otomatik yapilir.
 
 [Messages]
-; English custom messages (also act as the default fallback).
+; English (also the default fallback). Only standard Default.isl names here.
 english.BeveledLabel=This wizard installs the {#MyAppName} client on your computer.
 english.SetupWindowTitle={#MyAppName} Setup
 english.WelcomeLabel2=This will install [name] on your computer.[br][br]The setup runs a 4-step wizard that connects to a Remote Desktop server, lists the published applications and creates the matching .rdp shortcuts. No administrator rights are required.[br][br]Click Next to continue.
 english.FinishedHeadingLabel=Installation Complete
 english.FinishedLabel=[name] has been installed on your computer.[br][br]You can launch the wizard from the Start Menu or use the desktop shortcut.[br][br]Click Finish to close this wizard.
-english.LaunchSetup=Launch the Setup Wizard now
-english.LaunchSetupComment=Start the {#MyAppName} setup wizard
-english.UninstallProgram=Uninstall {#MyAppName}
-english.CreateDesktopIcon=Create a desktop shortcut
-english.AdditionalIcons=Additional shortcuts:
 
-; Turkish custom messages - shown when the user picks "turkish" at the
-; language selector. All strings match the labels rendered by SetupUI.ps1.
+; Turkish — shown when the user picks "turkish" at the language selector.
 turkish.BeveledLabel=Bu sihirbaz, {#MyAppName} istemcisini bilgisayarınıza kurar.
 turkish.SetupWindowTitle={#MyAppName} Kurulumu
 turkish.WelcomeLabel2=Bu sihirbaz, [name] uygulamasını bilgisayarınıza kuracak.[br][br]Kurulum, 4 adımlı bir sihirbaz çalıştırır: sunucuya bağlanır, yayınlanan uygulamaları listeler ve eşleşen .rdp kısayollarını oluşturur. Yönetici hakları gerektirmez.[br][br]Devam etmek için İleri'ye tıklayın.
 turkish.FinishedHeadingLabel=Kurulum Tamamlandı
 turkish.FinishedLabel=[name] bilgisayarınıza kuruldu.[br][br]Sihirbazı Başlat menüsünden veya masaüstü kısayolundan çalıştırabilirsiniz.[br][br]Kurulum sihirbazını kapatmak için Son'a tıklayın.
-turkish.LaunchSetup=Kurulum Sihirbazını Şimdi Başlat
-turkish.LaunchSetupComment={#MyAppName} kurulum sihirbazını başlat
-turkish.UninstallProgram={#MyAppName}'i Kaldır
-turkish.CreateDesktopIcon=Masaüstü kısayolu oluştur
-turkish.AdditionalIcons=Ek kısayollar:
 
 [CustomMessages]
-; English fallbacks for compile-time replacement ({cm:...})
 english.LaunchSetup=Launch the Setup Wizard now
 english.LaunchSetupComment=Start the {#MyAppName} setup wizard
 

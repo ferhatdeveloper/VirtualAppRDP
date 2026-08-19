@@ -1,0 +1,18 @@
+{
+  "version": "1.0.1",
+  "product": "RdpVirtualBoxApp-Server",
+  "listenPort": 3389,
+  "probeApi": {
+    "enabled": true,
+    "port": 8444,
+    "auth": "bearer"
+  },
+  "remoteApps": [],
+  "strategies": {
+    "direct": true,
+    "gateway": false,
+    "guacamole": false,
+    "tailscale": false,
+    "cloudflare": false
+  }
+}
