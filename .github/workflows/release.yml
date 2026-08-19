@@ -17,6 +17,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+# Aynı tag için art arda gelen run'ları iptal et
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 # Release oluşturmak için contents:write gerekli
 permissions:

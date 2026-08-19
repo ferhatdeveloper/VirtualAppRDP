@@ -24,6 +24,11 @@ on:
       - main
   workflow_dispatch:
 
+# Aynı branch/ref için art arda gelen run'ları iptal et (queue tıkanmasını önler)
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 # Gereksiz izinler verilmez, sadece default token yeterli
 permissions:
   contents: read
