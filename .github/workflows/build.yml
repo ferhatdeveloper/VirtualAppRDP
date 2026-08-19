@@ -8,22 +8,23 @@
 # Derleme adımları:
 #   1. Checkout + PowerShell 7.4 kurulumu
 #   2. PSScriptAnalyzer (lint) ve Pester (test)
-#   3. Wine + Inno Setup ile ISCC kullanarak Client + Server setup derleme
+#   3. amake/innosetup Docker image ile ISCC kullanarak Client + Server setup derleme
 #   4. SHA256SUMS üretimi ve artifact yükleme
 # ===============================================
 #
-# NEDEN ubuntu-latest?
+# NEDEN ubuntu-latest + Docker?
 #   Windows 2022 runner pool'unda süregelen bir incident var; tüm build
-#   run'ları birkaç saniye içinde 'Failure' dönüyor. GitHub status
-#   page'i 'All Systems Operational' olana kadar ubuntu-latest +
-#   Wine ile devam ediyoruz. Inno Setup resmi olarak Linux'ta Wine
-#   ile destekleniyor (https://jrsoftware.org/isdl.php).
+#   run'ları birkaç saniye içinde 'Failure' dönüyor.
 #
-# Bu workflow iki adımda işler:
-#   A) PowerShell analiz + testler pwsh ile (Ubuntu 24.04 pwsh 7.4 ile gelir)
-#   B) ISCC adımı Wine ile çalıştırılır; minimal ISS üretimi yine minimal
-#      fallback'i tercih eder ama bu sefer Wine uyumluluğu için yolları
-#      forward-slash olarak yazar.
+#   ubuntu-latest + amake/innosetup Docker image yaklaşımı çok daha hızlı:
+#   - Image zaten Wine + ISCC içeriyor (~500 MB, indirilmesi birkaç saniye)
+#   - Her build'de Wine/ISCC indirmiyor
+#   - ISCC çıktısı host makineye mount edilen /work dizinine yazılır
+#   - `chmod 777` ile permission sorunları çözülür
+#
+#   Refs:
+#     - https://github.com/amake/innosetup-docker
+#     - https://hub.docker.com/r/amake/innosetup
 
 name: Build
 
@@ -47,7 +48,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Setup Executables (Ubuntu + Wine)
+    name: Build Setup Executables (Ubuntu + Docker Inno Setup)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -100,186 +101,206 @@ jobs:
           $config.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $config
 
-      # ---------- 6. Wine + Inno Setup kur ----------
-      - name: Install Wine and Inno Setup
-        shell: bash
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq wine wine64 wine32 cabextract unzip p7zip-full wget
-          # Inno Setup 6'yı indir ve wine ile aç
-          wget -q "https://jrsoftware.org/download.php/is.exe" -O /tmp/is.exe
-          mkdir -p $HOME/.wine/drive_c/InnoSetup
-          WINEDEBUG=-all WINEPREFIX=$HOME/.wine wine /tmp/is.exe /sp- /verysilent /dir=C:\\InnoSetup /tasks=''
-          ls -la "$HOME/.wine/drive_c/InnoSetup/" || true
-
-      # ---------- 7. Client setup derle ----------
-      - name: Build Client Setup
+      # ---------- 6. ISCC + Client setup derleme (amake/innosetup Docker image) ----------
+      - name: Build Client Setup via Docker Inno Setup
         shell: bash
         run: |
           set -e
-          WINEPREFIX=$HOME/.wine
-          ISCC="wine ${WINEPREFIX}/drive_c/InnoSetup/ISCC.exe"
-          # Önce orijinal script'i dene
-          if $ISCC "Z:\\$(pwd)/src/inno/RdpVirtualBoxApp-Client.iss" > iscc_client.log 2>&1; then
-            echo "Original Client.iss derlendi."
+          # Build ve output dizinleri oluştur (Docker uid 1000 ile uyumlu)
+          mkdir -p build/output
+          chmod 777 build build/output
+          # Önce orijinal Client.iss'i dene
+          if docker run --rm -i --user 1000:1000 \
+               -v "$(pwd):/work" \
+               amake/innosetup:innosetup6-bookworm \
+               src/inno/RdpVirtualBoxApp-Client.iss \
+               > iscc_client.log 2>&1; then
+            echo "Original Client.iss derlendi (build/output/Output'a yazildi)."
+            # Output dizinini build/output'a tasi (ISCC varsayilan olarak ./Output yazar)
+            if [ -d "Output" ]; then
+              mv -f Output/*.exe build/output/ 2>/dev/null || true
+            fi
           else
-            echo "Original Client.iss FAILED, minimal fallback yazılıyor..."
-            # Repo-root relative path'leri kullanan, Wine-uyumlu minimal script yaz.
+            echo "Original Client.iss FAILED, minimal fallback yaziliyor..."
+            cat iscc_client.log | tail -50
+          fi
+          # Eğer orijinal derlenmediyse minimal fallback yaz
+          if ! ls build/output/RdpVirtualBoxApp-Client-*.exe 1> /dev/null 2>&1; then
             cat > build/client.iss <<'EOF'
-          [Setup]
-          AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
-          AppName=Rdp Virtual Box App
-          AppVersion=1.0.0
-          AppVerName=Rdp Virtual Box App 1.0.0
-          AppPublisher=Rdp Virtual Box App
-          AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
-          AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
-          AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
-          AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
-          DefaultDirName={autopf}\RdpVirtualBoxApp
-          DefaultGroupName=Rdp Virtual Box App
-          DisableProgramGroupPage=yes
-          AllowNoIcons=yes
-          WizardStyle=modern
-          WizardSizePercent=120
-          PrivilegesRequired=lowest
-          PrivilegesRequiredOverridesAllowed=dialog
-          MinVersion=10.0
-          ArchitecturesAllowed=x64compatible
-          ArchitecturesInstallIn64BitMode=x64compatible
-          OutputDir=build/output
-          OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
-          Compression=lzma2/ultra64
-          SolidCompression=yes
-          VersionInfoVersion=1.0.0
-          VersionInfoCompany=Rdp Virtual Box App
-          VersionInfoDescription=Rdp Virtual Box App Client Setup
-          VersionInfoProductName=Rdp Virtual Box App Client
-          VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
-          UninstallDisplayIcon={app}\powershell\SetupUI.ps1
-          UninstallDisplayName=Rdp Virtual Box App
+[Setup]
+AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
+AppName=Rdp Virtual Box App
+AppVersion=1.0.0
+AppVerName=Rdp Virtual Box App 1.0.0
+AppPublisher=Rdp Virtual Box App
+AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
+AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
+AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
+AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
+DefaultDirName={autopf}\RdpVirtualBoxApp
+DefaultGroupName=Rdp Virtual Box App
+DisableProgramGroupPage=yes
+AllowNoIcons=yes
+WizardStyle=modern
+WizardSizePercent=120
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
+MinVersion=10.0
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+OutputDir=build/output
+OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
+Compression=lzma2/ultra64
+SolidCompression=yes
+VersionInfoVersion=1.0.0
+VersionInfoCompany=Rdp Virtual Box App
+VersionInfoDescription=Rdp Virtual Box App Client Setup
+VersionInfoProductName=Rdp Virtual Box App Client
+VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
+UninstallDisplayIcon={app}\powershell\SetupUI.ps1
+UninstallDisplayName=Rdp Virtual Box App
 
-          [Languages]
-          Name: "english"; MessagesFile: "compiler:Default.isl"
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
 
-          [Tasks]
-          Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+[Tasks]
+Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
-          [Files]
-          Source: "src/powershell/client/*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "src/config/client/*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "src/assets/*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+[Files]
+Source: "src/powershell/client/*"; DestDir: "{app}\powershell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/config/client/*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/assets/*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-          [Dirs]
-          Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
-          Name: "{userlocalappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
-          Name: "{userdocs}\RdpVirtualBoxApp"; Permissions: users-modify
+[Dirs]
+Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
+Name: "{userlocalappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+Name: "{userdocs}\RdpVirtualBoxApp"; Permissions: users-modify
 
-          [Icons]
-          Name: "{group}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"
-          Name: "{group}\Uninstall Rdp Virtual Box App"; Filename: "{uninstallexe}"
-          Name: "{autodesktop}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"; Tasks: desktopicon
+[Icons]
+Name: "{group}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"
+Name: "{group}\Uninstall Rdp Virtual Box App"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\Rdp Virtual Box App Setup"; Filename: "{app}\powershell\SetupUI.ps1"; Tasks: desktopicon
 
-          [Run]
-          Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch the Setup Wizard"; Flags: nowait postinstall skipifsilent; Parameters: "-ExecutionPolicy Bypass -File ""{app}\powershell\SetupUI.ps1"""
+[Run]
+Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch the Setup Wizard"; Flags: nowait postinstall skipifsilent; Parameters: "-ExecutionPolicy Bypass -File ""{app}\powershell\SetupUI.ps1"""
 
-          [UninstallDelete]
-          Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
-          Type: filesandordirs; Name: "{userlocalappdata}\RdpVirtualBoxApp"
-          Type: filesandordirs; Name: "{userdocs}\RdpVirtualBoxApp"
-          EOF
-            mkdir -p build/output
-            if ! $ISCC "Z:\\$(pwd)/build/client.iss" > iscc_client.log 2>&1; then
-              cat iscc_client.log
+[UninstallDelete]
+Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
+Type: filesandordirs; Name: "{userlocalappdata}\RdpVirtualBoxApp"
+Type: filesandordirs; Name: "{userdocs}\RdpVirtualBoxApp"
+EOF
+            chmod 777 build/client.iss
+            if ! docker run --rm -i --user 1000:1000 \
+                 -v "$(pwd):/work" \
+                 amake/innosetup:innosetup6-bookworm \
+                 build/client.iss > iscc_client.log 2>&1; then
+              cat iscc_client.log | tail -50
               exit 1
+            fi
+            if [ -d "Output" ]; then
+              mv -f Output/*.exe build/output/ 2>/dev/null || true
             fi
           fi
           ls -la build/output/*.exe
 
-      # ---------- 8. Server setup derle ----------
-      - name: Build Server Setup
+      # ---------- 7. ISCC + Server setup derleme ----------
+      - name: Build Server Setup via Docker Inno Setup
         shell: bash
         run: |
           set -e
-          WINEPREFIX=$HOME/.wine
-          ISCC="wine ${WINEPREFIX}/drive_c/InnoSetup/ISCC.exe"
-          if $ISCC "Z:\\$(pwd)/src/inno/RdpVirtualBoxApp-Server.iss" > iscc_server.log 2>&1; then
+          chmod 777 build build/output
+          if docker run --rm -i --user 1000:1000 \
+               -v "$(pwd):/work" \
+               amake/innosetup:innosetup6-bookworm \
+               src/inno/RdpVirtualBoxApp-Server.iss \
+               > iscc_server.log 2>&1; then
             echo "Original Server.iss derlendi."
+            if [ -d "Output" ]; then
+              mv -f Output/*.exe build/output/ 2>/dev/null || true
+            fi
           else
-            echo "Original Server.iss FAILED, minimal fallback yazılıyor..."
+            echo "Original Server.iss FAILED, minimal fallback yaziliyor..."
+            cat iscc_server.log | tail -50
+          fi
+          if ! ls build/output/RdpVirtualBoxApp-Server-*.exe 1> /dev/null 2>&1; then
             cat > build/server.iss <<'EOF'
-          [Setup]
-          AppId=8B6A8C2D-1234-5678-9012-RDPVB-SERVER1
-          AppName=Rdp Virtual Box App - Server
-          AppVersion=1.0.0
-          AppVerName=Rdp Virtual Box App - Server 1.0.0
-          AppPublisher=ferhatdeveloper
-          AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
-          AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
-          AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
-          AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
-          DefaultDirName={autopf}\RdpVirtualBoxApp
-          DefaultGroupName=Rdp Virtual Box App - Server
-          DisableProgramGroupPage=yes
-          AllowNoIcons=yes
-          WizardStyle=modern
-          WizardSizePercent=120
-          PrivilegesRequired=admin
-          MinVersion=10.0
-          ArchitecturesAllowed=x64compatible
-          ArchitecturesInstallIn64BitMode=x64compatible
-          OutputDir=build/output
-          OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
-          Compression=lzma2/ultra64
-          SolidCompression=yes
-          VersionInfoVersion=1.0.0
-          VersionInfoCompany=ferhatdeveloper
-          VersionInfoDescription=Rdp Virtual Box App Server Setup
-          VersionInfoProductName=Rdp Virtual Box App Server
-          VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
-          UninstallDisplayIcon={app}\PowerShell\ServerSetupUI.ps1
-          UninstallDisplayName=Rdp Virtual Box App - Server
+[Setup]
+AppId=8B6A8C2D-1234-5678-9012-RDPVB-SERVER1
+AppName=Rdp Virtual Box App - Server
+AppVersion=1.0.0
+AppVerName=Rdp Virtual Box App - Server 1.0.0
+AppPublisher=ferhatdeveloper
+AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
+AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
+AppUpdatesURL=https://github.com/ferhatdeveloper/VirtualAppRDP/releases
+AppCopyright=Copyright (C) 2026 Rdp Virtual Box App
+DefaultDirName={autopf}\RdpVirtualBoxApp
+DefaultGroupName=Rdp Virtual Box App - Server
+DisableProgramGroupPage=yes
+AllowNoIcons=yes
+WizardStyle=modern
+WizardSizePercent=120
+PrivilegesRequired=admin
+MinVersion=10.0
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+OutputDir=build/output
+OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
+Compression=lzma2/ultra64
+SolidCompression=yes
+VersionInfoVersion=1.0.0
+VersionInfoCompany=ferhatdeveloper
+VersionInfoDescription=Rdp Virtual Box App Server Setup
+VersionInfoProductName=Rdp Virtual Box App Server
+VersionInfoCopyright=Copyright (C) 2026 Rdp Virtual Box App
+UninstallDisplayIcon={app}\PowerShell\ServerSetupUI.ps1
+UninstallDisplayName=Rdp Virtual Box App - Server
 
-          [Languages]
-          Name: "english"; MessagesFile: "compiler:Default.isl"
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
 
-          [Tasks]
-          Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+[Tasks]
+Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
-          [Files]
-          Source: "src/powershell/server/*.ps1"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "src/config/server/*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "src/assets/server/*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "src/assets/icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
+[Files]
+Source: "src/powershell/server/*.ps1"; DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/config/server/*"; DestDir: "{app}\Config"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/assets/server/*"; DestDir: "{app}\Assets"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "src/assets/icon.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 
-          [Dirs]
-          Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
-          Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
-          Name: "{commondata}\RdpVirtualBoxApp\Config"; Permissions: users-modify
-          Name: "{commondata}\RdpVirtualBoxApp\Manifest"; Permissions: users-modify
+[Dirs]
+Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
+Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+Name: "{commondata}\RdpVirtualBoxApp\Config"; Permissions: users-modify
+Name: "{commondata}\RdpVirtualBoxApp\Manifest"; Permissions: users-modify
 
-          [Icons]
-          Name: "{group}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"
-          Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
-          Name: "{autodesktop}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"; Tasks: desktopicon
+[Icons]
+Name: "{group}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"
+Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\Rdp Virtual Box App - Server"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; IconFilename: "{app}\Assets\icon.ico"; Tasks: desktopicon
 
-          [Run]
-          Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; Description: "Launch Server Setup"; Flags: nowait postinstall skipifsilent
+[Run]
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\PowerShell\ServerSetupUI.ps1"""; Description: "Launch Server Setup"; Flags: nowait postinstall skipifsilent
 
-          [UninstallDelete]
-          Type: filesandordirs; Name: "{commondata}\RdpVirtualBoxApp"
-          Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
-          EOF
-            mkdir -p build/output
-            if ! $ISCC "Z:\\$(pwd)/build/server.iss" > iscc_server.log 2>&1; then
-              cat iscc_server.log
+[UninstallDelete]
+Type: filesandordirs; Name: "{commondata}\RdpVirtualBoxApp"
+Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
+EOF
+            chmod 777 build/server.iss
+            if ! docker run --rm -i --user 1000:1000 \
+                 -v "$(pwd):/work" \
+                 amake/innosetup:innosetup6-bookworm \
+                 build/server.iss > iscc_server.log 2>&1; then
+              cat iscc_server.log | tail -50
               exit 1
+            fi
+            if [ -d "Output" ]; then
+              mv -f Output/*.exe build/output/ 2>/dev/null || true
             fi
           fi
           ls -la build/output/*.exe
 
-      # ---------- 9. SHA256SUMS ----------
+      # ---------- 8. SHA256SUMS ----------
       - name: Generate SHA256SUMS
         shell: bash
         run: |
@@ -289,7 +310,7 @@ jobs:
           done > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      # ---------- 10. Artifact upload ----------
+      # ---------- 9. Artifact upload ----------
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -301,7 +322,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # ---------- 11. Diagnostik loglar ----------
+      # ---------- 10. Diagnostik loglar ----------
       - name: Upload ISCC and analyzer logs
         if: always()
         uses: actions/upload-artifact@v4
