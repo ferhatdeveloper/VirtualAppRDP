@@ -175,7 +175,7 @@ function IsWindowsVersionOK: Boolean;
 var
   VersionInfo: TWindowsVersion;
 begin
-  VersionInfo := GetWindowsVersion;
+  GetWindowsVersionEx(VersionInfo);
   // Major >= 10 means Windows 10 / 11 / Server 2016+.
   Result := (VersionInfo.Major > 10) or
             ((VersionInfo.Major = 10) and (VersionInfo.Build >= RequiredBuildNumber));
