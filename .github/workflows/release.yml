@@ -51,15 +51,16 @@ jobs:
         run: |
           set -e
           mkdir -p build/output
+          chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
           chmod 777 build build/output
-          if ! docker run --rm -i --user 1000:1000 \
+          if ! docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Client.iss 2>&1 | tail -20; then
             echo "Original Client.iss FAILED, fallback kullaniliyor: .github/fallback-iss/client.iss"
             cp .github/fallback-iss/client.iss build/client.iss
             chmod 777 build/client.iss
-            docker run --rm -i --user 1000:1000 \
+            docker run --rm -i \
               -v "$(pwd):/work" \
               amake/innosetup:innosetup6-bookworm \
               build/client.iss
@@ -71,15 +72,16 @@ jobs:
         shell: bash
         run: |
           set -e
+          chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
           chmod 777 build build/output
-          if ! docker run --rm -i --user 1000:1000 \
+          if ! docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Server.iss 2>&1 | tail -20; then
             echo "Original Server.iss FAILED, fallback kullaniliyor: .github/fallback-iss/server.iss"
             cp .github/fallback-iss/server.iss build/server.iss
             chmod 777 build/server.iss
-            docker run --rm -i --user 1000:1000 \
+            docker run --rm -i \
               -v "$(pwd):/work" \
               amake/innosetup:innosetup6-bookworm \
               build/server.iss

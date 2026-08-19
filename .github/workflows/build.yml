@@ -155,8 +155,8 @@ jobs:
           chmod 777 build build/output output 2>/dev/null || true
           # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          # Önce orijinal Client.iss'i dene
-          if docker run --rm -i --user 1000:1000 \
+          # Önce orijinal Client.iss'i dene (root olarak ki tum dosyalari okuyabilsin)
+          if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Client.iss \
@@ -178,7 +178,7 @@ jobs:
             echo "Fallback .iss kullaniliyor: .github/fallback-iss/client.iss"
             cp .github/fallback-iss/client.iss build/client.iss
             chmod 777 build/client.iss
-            if ! docker run --rm -i --user 1000:1000 \
+            if ! docker run --rm -i \
                  -v "$(pwd):/work" \
                  amake/innosetup:innosetup6-bookworm \
                  build/client.iss > iscc_client.log 2>&1; then
@@ -202,7 +202,7 @@ jobs:
           mkdir -p output
           chmod 777 build build/output output 2>/dev/null || true
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          if docker run --rm -i --user 1000:1000 \
+          if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
                src/inno/RdpVirtualBoxApp-Server.iss \
@@ -222,7 +222,7 @@ jobs:
             echo "Fallback .iss kullaniliyor: .github/fallback-iss/server.iss"
             cp .github/fallback-iss/server.iss build/server.iss
             chmod 777 build/server.iss
-            if ! docker run --rm -i --user 1000:1000 \
+            if ! docker run --rm -i \
                  -v "$(pwd):/work" \
                  amake/innosetup:innosetup6-bookworm \
                  build/server.iss > iscc_server.log 2>&1; then
