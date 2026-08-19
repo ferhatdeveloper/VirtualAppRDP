@@ -160,7 +160,7 @@ function Invoke-AppScan {
 
         $iterator = $files
         if ($Parallel.IsPresent -and $PSVersionTable.PSVersion.Major -ge 7) {
-            $iterator = $files.ForEach { $_ } # marker - actual parallel handled below
+            $iterator = $files.ForEach({ $_ }) # marker - actual parallel handled below
         }
 
         foreach ($file in $iterator) {

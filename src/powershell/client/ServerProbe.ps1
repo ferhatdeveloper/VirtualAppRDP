@@ -135,7 +135,7 @@ function Test-RemotePort {
                                   -ErrorAction Stop
         $result = [bool] $tnc
     } catch {
-        Write-Verbose "Test-RemotePort: $ComputerName:$Port baglanti testi basarisiz -> $($_.Exception.Message)"
+        Write-Verbose "Test-RemotePort: ${ComputerName}:${Port} baglanti testi basarisiz -> $($_.Exception.Message)"
         $result = $false
     }
     return $result

@@ -433,15 +433,24 @@ $chkTs = New-Object System.Windows.Forms.CheckBox; $chkTs.Text = "Tailscale (mes
 $chkCf = New-Object System.Windows.Forms.CheckBox; $chkCf.Text = "Cloudflare Tunnel";                           $chkCf.Checked = $false; $chkCf.Location = New-Object System.Drawing.Point(15, 125); $chkCf.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkCf)
 $chkAp = New-Object System.Windows.Forms.CheckBox; $chkAp.Text = "App Kutuphanesi (RemoteApp yayinlama)";        $chkAp.Checked = $true;  $chkAp.Location = New-Object System.Drawing.Point(15, 150); $chkAp.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkAp)
 
-$chkRds.Add_CheckedChanged({ $script:WizardData.InstallRdsRoles  = $chkRds.Checked })
-$chkFw .Add_CheckedChanged({ $script:WizardData.ConfigureFirewall = $chkFw.Checked })
-$chkGw .Add_CheckedChanged({ $script:WizardData.InstallGateway = $chkGw.Checked })
-$chkGu .Add_CheckedChanged({ $script:WizardData.InstallGuacamole = $chkGu.Checked })
-$chkTs .Add_CheckedChanged({ $script:WizardData.InstallTailscale = $chkTs.Checked })
-$chkCf .Add_CheckedChanged({ $script:WizardData.InstallCloudflare = $chkCf.Checked })
-$chkAp .Add_CheckedChanged({ $script:WizardData.PublishApps = $chkAp.Checked })
-$rbSelf.Add_CheckedChanged({ if ($rbSelf.Checked) { $script:WizardData.CertMode = 'SelfSigned' } })
-$rbCa  .Add_CheckedChanged({ if ($rbCa.Checked)  { $script:WizardData.CertMode = 'CASigned'   } })
+# Checkbox/radio state'leri Next handler'inda senkron olarak WizardData'ya yazilir
+# (parser-friendly: event handler baglama yerine snapshot okuma).
+# Asagidaki yardimci fonksiyon Next event'inden cagrilir.
+
+function Update-WizardDataFromStep2 {
+    $script:WizardData.InstallRdsRoles    = [bool] $chkRds.Checked
+    $script:WizardData.ConfigureFirewall = [bool] $chkFw.Checked
+    $script:WizardData.InstallGateway    = [bool] $chkGw.Checked
+    $script:WizardData.InstallGuacamole  = [bool] $chkGu.Checked
+    $script:WizardData.InstallTailscale  = [bool] $chkTs.Checked
+    $script:WizardData.InstallCloudflare = [bool] $chkCf.Checked
+    $script:WizardData.PublishApps       = [bool] $chkAp.Checked
+    if ($rbSelf.Checked) {
+        $script:WizardData.CertMode = 'SelfSigned'
+    } elseif ($rbCa.Checked) {
+        $script:WizardData.CertMode = 'CASigned'
+    }
+}
 
 # -----------------------------------------------------------------------------
 # STEP 3 - License check
@@ -495,19 +504,18 @@ $btnRunLic.FlatStyle = 'Flat'
 $btnRunLic.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
 $p3.Controls.Add($btnRunLic)
 
-$btnRunLic.Add_Click({
-    $txtLic.AppendText("`n--- Lisans tespiti baslatildi: $(Get-Date -Format 's') ---`n")
+function Invoke-LicenseDetectionButton {
     try {
+        $log = "`n--- Lisans tespiti baslatildi: $(Get-Date -Format 's') ---`n"
         $detector = Join-Path $PSScriptRoot 'LicenseDetector.ps1'
         if (-not (Test-Path $detector)) {
-            $txtLic.AppendText("LicenseDetector.ps1 bulunamadi: $detector`n")
+            $log += "LicenseDetector.ps1 bulunamadi: $detector`n"
+            $txtLic.AppendText($log)
             Set-StatusBadge -Label $badgeLic -State 'err' -Text 'TESPIT BASARISIZ'
             return
         }
         $licResult = & $detector
-        $txtLic.AppendText($licResult | Out-String)
-        $txtLic.AppendText("`n")
-        # Read the structured output (assumes LicenseDetector prints a JSON line)
+        $log += (($licResult | Out-String) + "`n")
         $jsonLine = ($licResult | Where-Object { $_ -is [string] -and $_.TrimStart().StartsWith('{') } | Select-Object -Last 1)
         if ($jsonLine) {
             $obj = $jsonLine | ConvertFrom-Json -ErrorAction SilentlyContinue
@@ -515,9 +523,9 @@ $btnRunLic.Add_Click({
                 $script:WizardData.RdWebLicenseOk = [bool]$obj.HasRdWebLicense
                 $script:WizardData.RdWebGraceDays = [int]$obj.GracePeriodDays
                 if ($script:WizardData.RdWebLicenseOk) {
-                    Set-StatusBadge -Label $badgeLic -State 'ok' -Text "RD Web Lisansi MEVCUT (Grace: $($obj.GracePeriodDays) gun)"
+                    Set-StatusBadge -Label $badgeLic -State 'ok' -Text ("RD Web Lisansi MEVCUT (Grace: " + $obj.GracePeriodDays + " gun)")
                 } elseif ($obj.GracePeriodDays -gt 0) {
-                    Set-StatusBadge -Label $badgeLic -State 'warn' -Text "GRACE PERIOD ($($obj.GracePeriodDays) gun) - Lisans gerekli"
+                    Set-StatusBadge -Label $badgeLic -State 'warn' -Text ("GRACE PERIOD (" + $obj.GracePeriodDays + " gun) - Lisans gerekli")
                     $chkGuacAuto.Visible = $true
                 } else {
                     Set-StatusBadge -Label $badgeLic -State 'err' -Text 'RD Web Lisansi YOK'
@@ -528,11 +536,14 @@ $btnRunLic.Add_Click({
                 }
             }
         }
+        $txtLic.AppendText($log)
     } catch {
-        $txtLic.AppendText("HATA: $($_.Exception.Message)`n")
+        $txtLic.AppendText(("HATA: " + $_.Exception.Message + "`n"))
         Set-StatusBadge -Label $badgeLic -State 'err' -Text 'HATA OLUSTU'
     }
-})
+}
+
+$btnRunLic.add_Click({ Invoke-LicenseDetectionButton })
 
 # -----------------------------------------------------------------------------
 # STEP 4 - Connection strategy
