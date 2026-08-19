@@ -18,7 +18,6 @@ PrivilegesRequired=admin
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=output
 OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.0
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -35,12 +34,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 
 [Dirs]
-Name: "{commondata}\RdpVirtualBoxApp"; Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+Name: "{commonappdata}\RdpVirtualBoxApp"; Permissions: users-modify
+Name: "{commonappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
 
 [Icons]
 Name: "{group}\Uninstall Rdp Virtual Box App - Server"; Filename: "{uninstallexe}"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{commondata}\RdpVirtualBoxApp"
+Type: filesandordirs; Name: "{commonappdata}\RdpVirtualBoxApp"
 Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"

@@ -56,8 +56,7 @@ MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
-; Output
-OutputDir=build\output
+; Output (CI uses ISCC default ./Output; the workflow moves it)
 OutputBaseFilename=RdpVirtualBoxApp-Client-v{#MyAppVersion}
 SetupIconFile=src\assets\icon.ico
 UninstallDisplayIcon={app}\assets\icon.ico

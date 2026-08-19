@@ -51,10 +51,8 @@ WizardImageFile=src\assets\server\server-banner.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 ; Output
-OutputDir=output
 OutputBaseFilename=RdpVirtualBoxApp-Server-v{#MyAppVersion}
 ; Misc
-ShowLanguageDetectionWarning=no
 AppMutex=RdpVirtualBoxApp-Server-Setup-Mutex
 ; Min Windows version: Windows Server 2016 / Windows 10 1607
 MinVersion=10.0
@@ -84,16 +82,16 @@ Source: "src\assets\server\server-banner.bmp";           DestDir: "{app}\Assets"
 Source: "src\powershell\server\ServerSetupUI.ps1";       DestDir: "{app}";           Flags: ignoreversion
 
 [Dirs]
-Name: "{commondata}\RdpVirtualBoxApp";        Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Logs";    Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Config";  Permissions: users-modify
-Name: "{commondata}\RdpVirtualBoxApp\Manifest";Permissions: users-modify
+Name: "{commonappdata}\RdpVirtualBoxApp";        Permissions: users-modify
+Name: "{commonappdata}\RdpVirtualBoxApp\Logs";    Permissions: users-modify
+Name: "{commonappdata}\RdpVirtualBoxApp\Config";  Permissions: users-modify
+Name: "{commonappdata}\RdpVirtualBoxApp\Manifest";Permissions: users-modify
 
 [Icons]
 ; Start Menu shortcuts
 Name: "{group}\{#MyAppName}";                   Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; IconFilename: "{app}\Assets\icon.ico"; Comment: "Rdp Virtual Box App - Server Kurulum Sihirbazi"
 Name: "{group}\Sunucu Klasoru";                 Filename: "{app}";            IconFilename: "{app}\Assets\icon.ico"; Comment: "Kurulan sunucu dosyalari"
-Name: "{group}\Log Dosyalari";                  Filename: "{commondata}\RdpVirtualBoxApp\Logs"; Comment: "Kurulum log dosyalari"
+Name: "{group}\Log Dosyalari";                  Filename: "{commonappdata}\RdpVirtualBoxApp\Logs"; Comment: "Kurulum log dosyalari"
 Name: "{group}\Yardim / GitHub";                Filename: "{#MyAppURL}";      Comment: "Proje sayfasi"
 ; Desktop shortcut (optional task)
 Name: "{autodesktop}\{#MyAppName}";              Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; IconFilename: "{app}\Assets\icon.ico"; Comment: "Rdp Virtual Box App - Server Kurulum"; Tasks: desktopicon
@@ -104,7 +102,7 @@ Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -Fil
 
 [UninstallDelete]
 ; Optional: clean up %ProgramData%\RdpVirtualBoxApp entirely on uninstall.
-Type: filesandordirs; Name: "{commondata}\RdpVirtualBoxApp"
+Type: filesandordirs; Name: "{commonappdata}\RdpVirtualBoxApp"
 ; Remove the per-user app cache if present
 Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
 
@@ -147,7 +145,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     // Touch a marker file so the wizard knows install completed cleanly
-    SaveStringToFile(ExpandConstant('{commondata}\RdpVirtualBoxApp\installed.marker'),
+    SaveStringToFile(ExpandConstant('{commonappdata}\RdpVirtualBoxApp\installed.marker'),
                      Format('RdpVirtualBoxApp Server v%s installed on %s',
                             [ExpandConstant('{#MyAppVersion}'),
                              FormatDateTime('yyyy-mm-dd hh:nn:ss', Now)]),

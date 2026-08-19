@@ -19,7 +19,6 @@ PrivilegesRequiredOverridesAllowed=dialog
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputDir=output
 OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
 Compression=lzma2/ultra64
 SolidCompression=yes
