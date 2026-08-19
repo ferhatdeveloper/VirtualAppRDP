@@ -124,14 +124,14 @@ Describe 'AppRegistry' {
         Mock -CommandName 'Get-Content' -MockWith {
             param($LiteralPath,$Raw,$Encoding)
             return '{"apps":[]}'
-        } -ModuleName '*'
+        }
 
         Mock -CommandName 'Set-Content' -MockWith {
             param($LiteralPath,$Value,$Encoding,$Force)
             $script:jsonCaptured = $Value
-        } -ModuleName '*'
+        }
 
-        Mock -CommandName 'Test-Path' -MockWith { param($LiteralPath) return $true } -ModuleName '*'
+        Mock -CommandName 'Test-Path' -MockWith { param($LiteralPath) return $true }
 
         $script:jsonCaptured = $null
     }
@@ -151,7 +151,7 @@ Describe 'AppRegistry' {
         }
 
         It 'should reject a duplicate id' {
-            Mock -CommandName 'Get-Content' -MockWith { return '{"apps":[{"id":"erp","name":"ERP","alias":"erp.exe","exePath":"","category":"erp"}]}' } -ModuleName '*'
+            Mock -CommandName 'Get-Content' -MockWith { return '{"apps":[{"id":"erp","name":"ERP","alias":"erp.exe","exePath":"","category":"erp"}]}' }
             { Register-App -Id 'erp' -Name 'ERP' -Alias 'erp.exe' } | Should -Throw
         }
     }
@@ -161,7 +161,7 @@ Describe 'AppRegistry' {
         It 'should return all apps when called without -Id' {
             Mock -CommandName 'Get-Content' -MockWith {
                 return '{"apps":[{"id":"erp","name":"ERP","alias":"erp.exe","exePath":"","category":"erp"},{"id":"rpr","name":"Reports","alias":"rpr.exe","exePath":"","category":"reporting"}]}'
-            } -ModuleName '*'
+            }
             $apps = Get-RegisteredApp
             $apps.Count | Should -Be 2
             $apps[0].id | Should -Be 'erp'
@@ -171,7 +171,7 @@ Describe 'AppRegistry' {
         It 'should return only the matching app when -Id is provided' {
             Mock -CommandName 'Get-Content' -MockWith {
                 return '{"apps":[{"id":"erp","name":"ERP","alias":"erp.exe","exePath":"","category":"erp"},{"id":"rpr","name":"Reports","alias":"rpr.exe","exePath":"","category":"reporting"}]}'
-            } -ModuleName '*'
+            }
             $app = Get-RegisteredApp -Id 'rpr'
             $app.id | Should -Be 'rpr'
             $app.alias | Should -Be 'rpr.exe'
@@ -188,7 +188,7 @@ Describe 'AppRegistry' {
         It 'should remove the matching entry and persist the change' {
             Mock -CommandName 'Get-Content' -MockWith {
                 return '{"apps":[{"id":"erp","name":"ERP","alias":"erp.exe","exePath":"","category":"erp"},{"id":"rpr","name":"Reports","alias":"rpr.exe","exePath":"","category":"reporting"}]}'
-            } -ModuleName '*'
+            }
             $result = Unregister-App -Id 'erp'
             $result | Should -BeTrue
             $script:jsonCaptured | Should -Not -Match '"id"\s*:\s*"erp"'
@@ -206,7 +206,7 @@ Describe 'AppRegistry' {
         It 'should overwrite the matched entry with the new values' {
             Mock -CommandName 'Get-Content' -MockWith {
                 return '{"apps":[{"id":"erp","name":"Old ERP","alias":"erp.exe","exePath":"C:\\Old\\erp.exe","category":"erp"}]}'
-            } -ModuleName '*'
+            }
             $updated = Update-App -Id 'erp' -Name 'New ERP' -ExePath 'C:\New\erp.exe'
             $updated.name | Should -Be 'New ERP'
             $updated.exePath | Should -Be 'C:\New\erp.exe'

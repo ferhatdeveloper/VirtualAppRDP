@@ -1,133 +1,187 @@
 # Rdp Virtual Box App
 
-> **Generic RemoteApp setup wizard** — Windows Server üzerinde herhangi bir uygulamayı (ERP, muhasebe, raporlama, özel exe vb.) RemoteApp olarak yayınlayın ve kullanıcılarınıza kolayca dağıtın.
+**Türkçe:** Windows Server üzerinde **herhangi bir uygulamayı** (ERP, muhasebe, raporlama, özel exe…) RemoteApp olarak yayınlayan ve son kullanıcı bilgisayarına tek tıkla `.rdp` kısayolları üreten **iki parçalı** bir kurulum ürünüdür.
 
-[![Build Status](https://img.shields.io/badge/build-GitHub_Actions-blue?logo=github-actions)](https://github.com/ferhatdeveloper/VirtualAppRDP/actions)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![GitHub release](https://img.shields.io/badge/release-v1.0.0-blue)](https://github.com/ferhatdeveloper/VirtualAppRDP/releases)
+**English:** A two-part setup product that publishes any application on Windows Server as a RemoteApp and produces `.rdp` shortcuts on end-user workstations with a single click.
+
+> **Marka bağımsızdır.** Ürün adı **Rdp Virtual Box App**'tır; yayınlanan uygulamalar tamamen sunucu tarafından ve kullanıcı tarafından belirlenir.
 
 ---
 
-## İki Parçalı Mimari
+## İçindekiler / Table of Contents
 
-| Mod | Hedef | Çalıştırıldığı Yer | Yaptığı İşler |
+- [Proje Hakkında / About](#proje-hakkında--about)
+- [Özellikler / Features](#özellikler--features)
+- [Hızlı Başlangıç / Quick Start](#hızlı-başlangıç--quick-start)
+  - [Server Kurulumu](#server-kurulumu)
+  - [Client Kurulumu](#client-kurulumu)
+- [Bağlantı Stratejileri](#bağlantı-stratejileri)
+- [Mimari](#mimari)
+- [Ekran Görüntüleri](#ekran-görüntüleri)
+- [Dokümantasyon](#dokümantasyon)
+- [Lisans](#lisans)
+- [Katkıda Bulunma](#katkıda-bulunma)
+- [Sürüm Geçmişi](#sürüm-geçmişi)
+
+---
+
+## Proje Hakkında / About
+
+**Rdp Virtual Box App**, küçük ofisten kurumsal yapılara kadar her ölçekte **Remote Desktop Services** kurulumunu standart hale getiren iki EXE'den oluşur:
+
+| EXE | Hedef | Çalışma Yeri | Yaptıkları |
 |---|---|---|---|
-| **Server-Side Setup** | Windows Server 2016/2019/2022 | Server üzerinde (elevated) | RDS rolleri, RD Gateway, RemoteApp koleksiyonu, sertifika, firewall |
-| **Client-Side Setup** | Windows 10/11 (kullanıcı) | Kullanıcı makinesinde | `.rdp` dosyası, Start Menu kısayolu, Credential Manager, HTML5 URL |
+| `RdpVirtualBoxApp-Server-vX.X.X.exe` | IT Admin | Windows Server (elevated) | RDS rolleri, RemoteApp yayını, sertifika, lisans tespiti, Guacamole/Tailscale/Cloudflare fallback |
+| `RdpVirtualBoxApp-Client-vX.X.X.exe` | Son kullanıcı | Windows 10/11 | Sunucu tespiti, uygulama seçimi, `.rdp` üretimi, Start Menu kısayolu, web kısayolu |
 
-> **Kurulum sırası:** Önce **sunucu** kurulur, sonra **istemci**.
+Sıralama önemlidir: **Önce Server kurulur, sonra Client dağıtılır.**
+
+---
+
+## Özellikler / Features
+
+- **Tamamen generic** — yayınlanan uygulamalar sunucuda ne varsa odur (ERP, muhasebe, raporlama, özel exe).
+- **Çoklu bağlantı stratejisi** — Direct / RD Gateway / Apache Guacamole / Tailscale / Cloudflare Tunnel / Hybrid (birden fazlasını aynı anda seçebilirsiniz).
+- **HTML5 fallback** — RD Web lisansı yoksa otomatik Apache Guacamole kurulumu önerir.
+- **Credential Manager** entegrasyonu — şifre düz metin kaydedilmez.
+- **PWA manifest** desteği — Edge/Chrome üzerinden "uygulamayı yükle".
+- **WinForms wizard** — modern Aero arayüzü, Türkçe varsayılan.
+- **Otomatik log + rollback** — kurulum hata verirse kısmi kurulumları geri alır.
+- **CI/CD** — GitHub Actions ile `windows-latest` runner üzerinde otomatik derleme.
+
+---
+
+## Hızlı Başlangıç / Quick Start
+
+### Server Kurulumu
+
+```powershell
+# 1. Releases sayfasından RdpVirtualBoxApp-Server-vX.X.X.exe indirin
+# 2. Yönetici olarak çalıştırın
+RdpVirtualBoxApp-Server-v1.0.0.exe
+
+# 3. 7 adımlı sihirbazı takip edin:
+#    1. Hoş geldiniz + sunucu bilgisi
+#    2. Bileşen seçimi (RDS, Cert, RD Web, Gateway, Guacamole…)
+#    3. Lisans kontrolü (otomatik)
+#    4. Bağlantı stratejisi seçimi
+#    5. Uygulama seçimi (AppScanner ile .exe tarama)
+#    6. İnceleme
+#    7. Kurulum (rollback destekli)
+```
+
+Daha fazla bilgi için: [docs/server-setup-guide.md](docs/server-setup-guide.md)
+
+### Client Kurulumu
+
+```powershell
+# 1. Kullanıcıya RdpVirtualBoxApp-Client-vX.X.X.exe dağıtın
+# 2. Kullanıcı çalıştırır
+RdpVirtualBoxApp-Client-v1.0.0.exe
+
+# 3. 4 adımlı sihirbaz:
+#    1. Sunucu IP + kimlik bilgisi
+#    2. Server Probe sonuçları (yeşil/sarı/kırmızı)
+#    3. Uygulama + bağlantı tipi seçimi (Native / Web / Both)
+#    4. İnceleme + Install
+```
+
+Daha fazla bilgi için: [docs/client-setup-guide.md](docs/client-setup-guide.md)
+
+---
 
 ## Bağlantı Stratejileri
 
-Kurulum sırasında birden çok strateji seçilebilir:
+| Strateji | Açılan Port | Gereksinim | Kullanım Senaryosu |
+|---|---|---|---|
+| **Direct RDP** | TCP 3389 | - | Küçük ofis, LAN içi, NDA'lı ortam |
+| **RD Gateway** | TCP 443 (HTTPS) | RD Web lisansı gerekebilir | Kurumsal, dışarıdan erişim, firewall dostu |
+| **Apache Guacamole** | TCP 8443 (HTTPS) | JDK 17 + Tomcat 9 + MySQL | HTML5 erişim, RD Web lisansı yoksa fallback |
+| **Tailscale** | UDP 41641 (mesh) | Cloud relay (ücretsiz tier) | Sıfır konfigürasyon, NAT arkası cihazlar |
+| **Cloudflare Tunnel** | Outbound 443 | Cloudflare hesabı | Dışarıya port açmadan yayınlama |
+| **Hybrid** | Çoklu port | Yukarıdakilerin kombinasyonu | Farklı kullanıcı tipleri için farklı erişim |
 
-| Strateji | Port | Senaryo |
-|---|---|---|
-| **Direct RDP** | TCP 3389 | LAN / NDA ortamı |
-| **RD Gateway** | TCP 443 | Kurumsal, dışarıdan erişim |
-| **Apache Guacamole** | TCP 8443 | RD Web lisansı yoksa HTML5 fallback |
-| **Tailscale** | UDP 41641 (mesh) | NAT arkası, sıfır konfigürasyon |
-| **Cloudflare Tunnel** | Outbound 443 | Dışarıya port açmadan yayınlama |
-| **Hybrid** | Çoklu port | Birden çok strateji birlikte |
-
-## Quick Start
-
-### 1. Server tarafı (IT admin)
-
-1. `RdpVirtualBoxApp-Server-vX.X.X.exe` indirin.
-2. **Yönetici olarak** çalıştırın.
-3. 7 adımlı wizard: Hoşgeldiniz → Bileşen → Lisans → Bağlantı Stratejisi → Uygulama → İnceleme → Kurulum.
-4. Kurulum bittiğinde size bir **manifest** verir (client setup'a yapıştırılır).
-
-### 2. Client tarafı (son kullanıcı)
-
-1. `RdpVirtualBoxApp-Client-vX.X.X.exe` indirin ve çalıştırın.
-2. Server IP + kullanıcı bilgisi girin.
-3. ServerProbe otomatik sunucuyu tarar.
-4. Yayınlanan uygulamaları seçin.
-5. `.rdp` dosyaları, Start Menu kısayolları ve opsiyonel Credential Manager kaydı otomatik oluşur.
-
-## Build
-
-Yerel makinede (Windows + Inno Setup) veya GitHub Actions üzerinden:
-
-```powershell
-# PSScriptAnalyzer
-Invoke-ScriptAnalyzer -Path ./src -Recurse
-
-# Pester
-Invoke-Pester -Path ./tests -Output Detailed
-
-# Inno Setup ile build
-ISCC.exe src\inno\RdpVirtualBoxApp-Client.iss
-ISCC.exe src\inno\RdpVirtualBoxApp-Server.iss
-```
-
-CI/CD: Her push / PR'da `.github/workflows/build.yml` otomatik çalışır. Tag push'unda (örn. `v1.0.0`) `.github/workflows/release.yml` tetiklenir ve GitHub Releases'e artifact yüklenir.
-
-## Proje Yapısı
-
-```
-.
-├── .github/
-│   ├── workflows/
-│   │   ├── build.yml            # Build pipeline
-│   │   └── release.yml          # Tag → Release draft
-│   ├── ISSUE_TEMPLATE/
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   └── CODEOWNERS
-├── src/
-│   ├── inno/                    # Inno Setup betikleri
-│   ├── powershell/
-│   │   ├── client/              # Client modülleri
-│   │   └── server/              # Server modülleri
-│   ├── config/                  # Şablon dosyaları
-│   └── assets/                  # İkon, banner
-├── tests/                       # Pester testleri
-├── docs/                        # Kılavuzlar
-├── build/                       # Build çıktıları (gitignore)
-├── README.md
-├── LICENSE                      # MIT
-├── SECURITY.md
-└── CHANGELOG.md
-```
-
-## Gereksinimler
-
-**Server** (otomatik tespit edilir):
-- Windows Server 2016/2019/2022
-- 8 GB RAM min (Guacamole ile +4 GB)
-- Active Directory üyesi veya workgroup
-- WinRM aktif
-
-**Client**:
-- Windows 10 1809+ / Windows 11
-- .NET 4.7.2+
-- RDP istemcisi (built-in `mstsc.exe`)
-
-## Dokümantasyon
-
-Detaylı kılavuzlar için `docs/` klasörüne bakın:
-
-- [`docs/server-requirements.md`](docs/server-requirements.md)
-- [`docs/client-requirements.md`](docs/client-requirements.md)
-- [`docs/server-setup-guide.md`](docs/server-setup-guide.md)
-- [`docs/client-setup-guide.md`](docs/client-setup-guide.md)
-- [`docs/troubleshooting.md`](docs/troubleshooting.md)
-- [`docs/licensing-and-rdweb.md`](docs/licensing-and-rdweb.md)
-
-## Güvenlik
-
-Güvenlik açıkları için lütfen [SECURITY.md](SECURITY.md) dosyasına bakın — public issue açmayın.
-
-## Lisans
-
-MIT — Detaylar için [LICENSE](LICENSE).
-
-## Katkıda Bulunma
-
-PR açmadan önce [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) dosyasını doldurun. Tüm PR'lar CODEOWNERS onayı gerektirir.
+Detaylı karşılaştırma için: [docs/licensing-and-rdweb.md](docs/licensing-and-rdweb.md)
 
 ---
 
-**Repository:** https://github.com/ferhatdeveloper/VirtualAppRDP
+## Mimari
+
+```mermaid
+flowchart LR
+    subgraph User[USER WORKSTATION]
+        UW[Client Setup.exe] --> UW_Win[WinForms Wizard]
+        UW_Win --> RDP[.rdp file]
+        UW_Win --> WEB[HTML5 URL]
+        UW_Win --> CM[Credential Manager]
+    end
+
+    subgraph Server[REMOTEAPP SERVER]
+        SW[Server Setup.exe] --> SW_Win[WinForms Wizard]
+        SW_Win --> RDS[RDS Roles]
+        SW_Win --> RAP[RemoteApp Collection]
+        SW_Win --> SSL[SSL / Cert]
+        SW_Win --> FW[Firewall Rules]
+        SW_Win --> OPT[Strategy: Gateway/Guac/Tailscale/Cloudflare]
+    end
+
+    User <-- WinRM / RDP / HTTPS --> Server
+```
+
+---
+
+## Ekran Görüntüleri
+
+| Server Wizard | Client Wizard | Uygulama Seçimi |
+|---|---|---|
+| ![server-wizard](docs/images/server-wizard-placeholder.png) | ![client-wizard](docs/images/client-wizard-placeholder.png) | ![apps](docs/images/apps-placeholder.png) |
+
+> Gerçek ekran görüntüleri `docs/images/` altına eklenecektir.
+
+---
+
+## Dokümantasyon
+
+- [docs/server-requirements.md](docs/server-requirements.md) — Server tarafı gereksinimler
+- [docs/client-requirements.md](docs/client-requirements.md) — Client tarafı gereksinimler
+- [docs/server-setup-guide.md](docs/server-setup-guide.md) — IT Admin için adım adım kurulum
+- [docs/client-setup-guide.md](docs/client-setup-guide.md) — Son kullanıcı için kurulum
+- [docs/licensing-and-rdweb.md](docs/licensing-and-rdweb.md) — RD Web lisansı ve Guacamole karşılaştırması
+- [docs/troubleshooting.md](docs/troubleshooting.md) — Yaygın hatalar ve çözümler
+
+---
+
+## Lisans
+
+Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır.
+
+---
+
+## Katkıda Bulunma
+
+1. Bu repo'yu fork'layın.
+2. Feature branch oluşturun: `git checkout -b feature/amazing-thing`
+3. Değişikliklerinizi commit'leyin: `git commit -m "feat: amazing thing"`
+4. Branch'inizi push'layın: `git push origin feature/amazing-thing`
+5. Pull Request açın.
+
+Lütfen Pester testlerini çalıştırın:
+
+```powershell
+Install-Module Pester -Force -SkipPublisherCheck
+Invoke-Pester -Path ./tests -Output Detailed
+```
+
+---
+
+## Sürüm Geçmişi
+
+Tüm sürümler için: [CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## Repository
+
+**GitHub:** [https://github.com/ferhatdeveloper/VirtualAppRDP](https://github.com/ferhatdeveloper/VirtualAppRDP)
+
+Build durumu için: `.github/workflows/build.yml`

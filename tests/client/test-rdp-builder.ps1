@@ -96,7 +96,7 @@ Describe 'RdpBuilder' {
             $script:lastWrittenPath   = $LiteralPath
             $script:lastWrittenValue  = $Value
             $script:lastWrittenForce  = $Force
-        } -ModuleName '*'
+        }
 
         $script:lastWrittenPath  = $null
         $script:lastWrittenValue = $null

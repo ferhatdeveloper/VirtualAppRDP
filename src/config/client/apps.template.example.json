@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json.schemastore.org/example.json",
+  "_comment": "C2 tarafindan RdpBuilder.ps1 ile birlikte kullanilmak uzere hazirlanmis ornek generic uygulama sablonu. C1 (ServerProbe) kendi apps.template.json dosyasini kullaniyor — bu dosya C2'nin coklu-uygulama dongusunde kullanabilecegi baslangic ornegidir.",
+  "version": "1.0.0",
+  "description": "Rdp Virtual Box App - Generic uygulama sablonu. Sadece ozel/manuel uygulama ekleme icin fallback olarak kullanilir. Sunucudaki gercek liste ServerProbe.Get-RDRemoteApp ile gelir.",
+  "apps": [
+    {
+      "id": "example_erp",
+      "name": "Ornek ERP Uygulamasi",
+      "shortName": "ERP",
+      "executable": "erp.exe",
+      "remoteAppName": "Ornek ERP",
+      "alias": "erp",
+      "icon": "app.ico",
+      "category": "erp",
+      "default": true,
+      "description": "Ornek ERP uygulamasi icin sablon"
+    },
+    {
+      "id": "example_reports",
+      "name": "Ornek Raporlama",
+      "shortName": "Reports",
+      "executable": "reports.exe",
+      "remoteAppName": "Raporlama",
+      "alias": "reports",
+      "icon": "reports.ico",
+      "category": "reporting",
+      "default": false,
+      "description": "Raporlama araci icin sablon"
+    },
+    {
+      "id": "custom",
+      "name": "Ozel Yoldan Uygulama Ekle",
+      "shortName": "Custom",
+      "executable": "",
+      "remoteAppName": "",
+      "alias": "",
+      "icon": "generic.ico",
+      "category": "custom",
+      "default": false,
+      "description": "Sunucuda yayinlanmis herhangi bir RemoteApp icin manuel giris"
+    }
+  ]
+}

@@ -94,12 +94,12 @@ Describe 'ServerProbe' {
     Context 'When the server is unreachable' {
 
         BeforeEach {
-            Mock -CommandName 'Test-WSMan' -MockWith { return $null } -ModuleName '*'
-            Mock -CommandName 'Test-NetConnection' -MockWith { return $false } -ModuleName '*'
-            Mock -CommandName 'Get-WindowsFeature' -MockWith { throw 'WinRM unreachable' } -ModuleName '*'
-            Mock -CommandName 'Get-RDRemoteApp' -MockWith { throw 'WinRM unreachable' } -ModuleName '*'
-            Mock -CommandName 'Get-Certificate' -MockWith { return $null } -ModuleName '*'
-            Mock -CommandName 'Get-WmiObject' -MockWith { return $null } -ModuleName '*'
+            Mock -CommandName 'Test-WSMan' -MockWith { return $null }
+            Mock -CommandName 'Test-NetConnection' -MockWith { return $false }
+            Mock -CommandName 'Get-WindowsFeature' -MockWith { throw 'WinRM unreachable' }
+            Mock -CommandName 'Get-RDRemoteApp' -MockWith { throw 'WinRM unreachable' }
+            Mock -CommandName 'Get-Certificate' -MockWith { return $null }
+            Mock -CommandName 'Get-WmiObject' -MockWith { return $null }
         }
 
         It 'should return a result object even when the server is offline' {
@@ -136,8 +136,8 @@ Describe 'ServerProbe' {
     Context 'When the server is fully reachable' {
 
         BeforeEach {
-            Mock -CommandName 'Test-WSMan' -MockWith { return [pscustomobject]@{ State = 'Opened' } } -ModuleName '*'
-            Mock -CommandName 'Test-NetConnection' -MockWith { return $true } -ModuleName '*'
+            Mock -CommandName 'Test-WSMan' -MockWith { return [pscustomobject]@{ State = 'Opened' } }
+            Mock -CommandName 'Test-NetConnection' -MockWith { return $true }
             Mock -CommandName 'Get-WindowsFeature' -MockWith {
                 param($Name,$ComputerName)
                 return [pscustomobject]@{
@@ -145,13 +145,13 @@ Describe 'ServerProbe' {
                     DisplayName = $Name
                     InstallState = 'Installed'
                 }
-            } -ModuleName '*'
+            }
             Mock -CommandName 'Get-RDRemoteApp' -MockWith {
                 @(
                     [pscustomobject]@{ Alias = 'Notepad';   DisplayName = 'Notepad'  }
                     [pscustomobject]@{ Alias = 'Calculator';DisplayName = 'Calculator' }
                 )
-            } -ModuleName '*'
+            }
             Mock -CommandName 'Get-Certificate' -MockWith {
                 [pscustomobject]@{
                     Thumbprint     = 'ABCDEF1234567890ABCDEF1234567890ABCDEF12'
@@ -159,7 +159,7 @@ Describe 'ServerProbe' {
                     NotAfter       = (Get-Date).AddYears(2)
                     Issuer         = 'CN=SelfSigned'
                 }
-            } -ModuleName '*'
+            }
             Mock -CommandName 'Get-WmiObject' -MockWith {
                 param($Class,$ComputerName,$Credential)
                 return [pscustomobject]@{
@@ -167,7 +167,7 @@ Describe 'ServerProbe' {
                     Version        = '10.0.17763'
                     OSArchitecture = '64-bit'
                 }
-            } -ModuleName '*'
+            }
         }
 
         It 'should report reachable and winrm as true' {
@@ -213,8 +213,8 @@ Describe 'ServerProbe' {
     Context 'When the server is partially ready (some components missing)' {
 
         BeforeEach {
-            Mock -CommandName 'Test-WSMan' -MockWith { return [pscustomobject]@{ State = 'Opened' } } -ModuleName '*'
-            Mock -CommandName 'Test-NetConnection' -MockWith { return $true } -ModuleName '*'
+            Mock -CommandName 'Test-WSMan' -MockWith { return [pscustomobject]@{ State = 'Opened' } }
+            Mock -CommandName 'Test-NetConnection' -MockWith { return $true }
             Mock -CommandName 'Get-WindowsFeature' -MockWith {
                 param($Name,$ComputerName)
                 # Only the role itself is installed; Gateway is missing.
@@ -230,8 +230,8 @@ Describe 'ServerProbe' {
                     DisplayName  = $Name
                     InstallState = 'Installed'
                 }
-            } -ModuleName '*'
-            Mock -CommandName 'Get-RDRemoteApp' -MockWith { return @() } -ModuleName '*'
+            }
+            Mock -CommandName 'Get-RDRemoteApp' -MockWith { return @() }
             Mock -CommandName 'Get-Certificate' -MockWith {
                 [pscustomobject]@{
                     Thumbprint = 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'
@@ -239,10 +239,10 @@ Describe 'ServerProbe' {
                     NotAfter   = (Get-Date).AddYears(5)
                     Issuer     = 'CN=rdp.example.local'
                 }
-            } -ModuleName '*'
+            }
             Mock -CommandName 'Get-WmiObject' -MockWith {
                 [pscustomobject]@{ Caption = 'Microsoft Windows Server 2022 Datacenter'; Version = '10.0.20348' }
-            } -ModuleName '*'
+            }
         }
 
         It 'should mark the RD Gateway component as warning' {

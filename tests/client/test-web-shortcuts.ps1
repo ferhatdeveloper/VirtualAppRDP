@@ -92,7 +92,7 @@ Describe 'WebShortcuts' {
         Mock -CommandName 'Set-Content' -MockWith {
             param($LiteralPath,$Value,$Encoding,$Force)
             $script:written[$LiteralPath] = $Value
-        } -ModuleName '*'
+        }
         $script:written = @{}
     }
 

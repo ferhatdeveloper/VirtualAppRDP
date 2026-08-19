@@ -1,80 +1,223 @@
-# ===============================================
-# Rdp Virtual Box App — .gitignore
-# ===============================================
+# ---------------------------------------------------------------------------
+# Rdp Virtual Box App — Standard .gitignore
+# ---------------------------------------------------------------------------
 
-# --- Build çıktıları ---
+# --- Build outputs ---------------------------------------------------------
 build/
-dist/
-output/
+build/output/
 *.exe
 *.msi
+*.iso
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.deb
+*.rpm
+*.dmg
+*.pkg
 *.zip
 *.7z
+*.rar
+*.tar
+*.gz
+*.tgz
 *.tar.gz
-SHA256SUMS.txt
+*.whl
+*.jar
 
-# --- PowerShell geçici / artefaktları ---
-*.ps1xml
-*.psm1.bak
-*.psd1.bak
-
-# --- Inno Setup çıktıları ---
+# --- Inno Setup intermediates ---------------------------------------------
+Output/
 src/inno/Output/
-src/inno/*.txt
+*.iss.bak
+*.iss.orig
 
-# --- Log / Temp ---
-*.log
-*.tmp
-*.temp
-logs/
-
-# --- IDE / Editor ---
+# --- Visual Studio / .NET --------------------------------------------------
+.vs/
 .vscode/
+*.user
+*.suo
+*.userprefs
+*.sln.docstates
+*.userosscache
+*.sln.metaproj
+*.csproj.user
+*.csproj.vspscc
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Tt]est[Rr]esult*/
+TestResults/
+*.coverage
+*.coveragexml
+coverage.xml
+coverage.json
+coverage.html
+
+# --- PowerShell ------------------------------------------------------------
+*.ps1.bak
+*.ps1.orig
+*.psm1.bak
+# Allow test results but ignore local dev
+!TestResults/.gitkeep
+
+# --- NuGet / Packages ------------------------------------------------------
+packages/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.nuget.props
+*.nuget.targets
+
+# --- Node / JS (gelecekte kullanılırsa) ------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# --- Python (gelecekte kullanılırsa) ---------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+
+# --- IDE / Editor ----------------------------------------------------------
 .idea/
 *.swp
 *.swo
+*~
 .DS_Store
 Thumbs.db
-
-# --- OS ---
-.Trashes
+ehthumbs.db
+Desktop.ini
 $RECYCLE.BIN/
 
-# --- Secrets / Credentials (asla repo'ya gitmemeli) ---
-*.pfx
-*.p12
+# --- Secrets & Local Config -----------------------------------------------
+.env
+.env.local
+.env.*.local
+local.settings.json
+*.local.json
+*.local.yaml
+*.local.yml
+secrets/
 *.key
 *.pem
+*.pfx
+*.p12
+credentials.json
 secrets.json
-appsettings.*.json
-.env
-.env.*
+*.keystore
+*.jks
+*.truststore
 
-# --- Node / Test (Pester outputs vs.) ---
-TestResults/
-coverage/
-*.coverage
-*.coveragexml
+# Sertifikaları asla commit'lemeyin
+**/*.pfx
+**/*.p12
+**/*.key
+**/*.pem
+!src/config/**/*.template.pem
+!docs/**/*.example.pem
 
-# --- Pester ---
-tests/results/
-*.Tests.ps1.xml
+# --- Logs ------------------------------------------------------------------
+*.log
+logs/
+*.log.*
+*.log-[0-9]*
 
-# --- PowerShell modül cache ---
-~/.local/
+# --- Temporary / Cache -----------------------------------------------------
+tmp/
+temp/
+.tmp/
+.cache/
+*.tmp
+*.bak
+*.orig
+*.swp
+*.swo
+
+# --- PowerShell modules local ----------------------------------------------
 Modules/
-Packages/
-OneDrive/
-Documenti/
-Documentos/
-Imágenes/
-Immagini/
-Imagens/
+PSModules/
 
-# --- NuGet / Chocolatey ---
-packages/
-*.nupkg
+# --- Pester test output ----------------------------------------------------
+TestDrive/
+TestDrive:*/
+*.Tests.html
+pester-output.xml
+Pester.Tests.xml
 
-# --- Generated artifacts ---
-*.user
-*.suo
+# --- PSScriptAnalyzer cache ------------------------------------------------
+PSScriptAnalyzer.cache
+PSSA-Cache/
+
+# --- Azure / Cloud config (opsiyonel) -------------------------------------
+.azure/
+.aws/
+.gcp/
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# --- OS specific -----------------------------------------------------------
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Linux
+*~
+.fuse_hidden*
+.Trash-*
+
+# --- Docker (opsiyonel) ---------------------------------------------------
+.dockerignore
+docker-compose.override.yml
+docker-compose.*.yml
+
+# --- Kişiye özel / Local override -----------------------------------------
+*.local
+.local-*
+/local-settings.ps1
+
+# --- GitHub-specific -------------------------------------------------------
+.github/CODEOWNERS.local
+
+# --- Sentry / monitoring (opsiyonel) --------------------------------------
+.sentryclirc
+.sentry/
+
+# --- MkDocs / docs build (opsiyonel) -------------------------------------
+site/
+docs/_build/
+docs/.doctrees/
+.mkdocs/
+
+# --- Allow explicit template files -----------------------------------------
+!**/*.template.json
+!**/*.template.txt
+!**/*.template.ps1
+!**/*.template.properties
