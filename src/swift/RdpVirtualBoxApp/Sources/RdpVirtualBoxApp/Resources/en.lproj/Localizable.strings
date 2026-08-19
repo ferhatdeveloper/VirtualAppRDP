@@ -1,0 +1,50 @@
+/* =====================================================================
+ *  Localizable.strings (en) - English fallback
+ *  Rdp Virtual Box App - macOS Native Client
+ * ===================================================================== */
+
+"form.title" = "Rdp Virtual Box App - Setup";
+
+"step.1.title" = "Server information";
+"step.2.title" = "Server probe results";
+"step.3.title" = "Application and access type";
+"step.4.title" = "Review and install";
+
+"label.server.ip" = "Server IP:";
+"label.port" = "Port:";
+"label.username" = "Username (domain\\user):";
+"label.password" = "Password:";
+"button.probe" = "Probe server";
+
+"header.component" = "Component";
+"header.status" = "Status";
+"header.value" = "Value";
+"label.recommendations" = "Recommendations";
+
+"label.choose.apps" = "Select applications to install (multiple allowed):";
+"label.access.type" = "Access type";
+"label.credential" = "Credential handling";
+"label.custom.app.path" = "Custom application path (optional):";
+
+"label.summary" = "Review your selections:";
+"button.install" = "Start install";
+
+"button.back" = "Back";
+"button.next" = "Next";
+"button.cancel" = "Cancel";
+"label.installing" = "Installing, please wait...";
+"label.probe.progress" = "Probing server, please wait...";
+
+"status.ok" = "OK";
+"status.warn" = "WARNING";
+"status.error" = "ERROR";
+
+"error.invalid.host" = "Please enter a valid IPv4 or hostname.";
+"error.invalid.port" = "Port must be between 1 and 65535.";
+"error.invalid.username" = "Username must be in DOMAIN\\user or user@domain format.";
+"error.missing.password" = "Password cannot be empty.";
+"error.probe.failed" = "Server probe failed: %@";
+
+"success.install.done" = "Setup completed successfully.";
+
+"warning.embed" = "Embedding credentials in RDP files is not secure. Continue?";

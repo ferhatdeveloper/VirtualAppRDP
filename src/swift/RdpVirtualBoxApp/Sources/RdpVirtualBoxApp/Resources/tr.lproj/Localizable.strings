@@ -1,0 +1,61 @@
+/* =====================================================================
+ *  Localizable.strings (tr) - Turkce varsayilan
+ *  Rdp Virtual Box App - macOS Native Client
+ * ===================================================================== */
+
+/* Form basligi */
+"form.title" = "Rdp Virtual Box App - Kurulum";
+
+/* Wizard adimlari */
+"step.1.title" = "Sunucu bilgileri";
+"step.2.title" = "Sunucu tespit sonuçları";
+"step.3.title" = "Uygulama ve erişim tipi";
+"step.4.title" = "İnceleme ve kurulum";
+
+/* Step 1 etiketleri */
+"label.server.ip" = "Sunucu IP:";
+"label.port" = "Port:";
+"label.username" = "Kullanıcı adı (domain\\user):";
+"label.password" = "Parola:";
+"button.probe" = "Sunucuyu Tara";
+
+/* Step 2 etiketleri */
+"header.component" = "Bileşen";
+"header.status" = "Durum";
+"header.value" = "Değer";
+"label.recommendations" = "Öneriler";
+
+/* Step 3 etiketleri */
+"label.choose.apps" = "Kurulacak uygulamaları seçin (çoklu seçim):";
+"label.access.type" = "Erişim Tipi";
+"label.credential" = "Kimlik Bilgisi Yönetimi";
+"label.custom.app.path" = "Özel uygulama yolu (opsiyonel):";
+
+/* Step 4 etiketleri */
+"label.summary" = "Seçimlerinizi inceleyin:";
+"button.install" = "Kurulumu Başlat";
+
+/* Genel */
+"button.back" = "Geri";
+"button.next" = "İleri";
+"button.cancel" = "İptal";
+"label.installing" = "Kurulum yapılıyor, lütfen bekleyin...";
+"label.probe.progress" = "Sunucu taranıyor, lütfen bekleyin...";
+
+/* Status sabitleri */
+"status.ok" = "TAMAM";
+"status.warn" = "UYARI";
+"status.error" = "HATA";
+
+/* Hata mesajlari */
+"error.invalid.host" = "Lütfen geçerli bir IPv4 veya hostname girin.";
+"error.invalid.port" = "Port 1 ile 65535 arasında olmalıdır.";
+"error.invalid.username" = "Kullanıcı adı DOMAIN\\kullanici veya kullanici@domain formatında olmalıdır.";
+"error.missing.password" = "Parola boş olamaz.";
+"error.probe.failed" = "Sunucu taraması başarısız: %@";
+
+/* Tamam mesajlari */
+"success.install.done" = "Kurulum başarıyla tamamlandı.";
+
+/* Embed uyarisi */
+"warning.embed" = "Kimlik bilgisini RDP dosyasına gömmek güvenli değildir. Devam edilsin mi?";

@@ -29,10 +29,11 @@
 
 **Rdp Virtual Box App**, küçük ofisten kurumsal yapılara kadar her ölçekte **Remote Desktop Services** kurulumunu standart hale getiren iki EXE'den oluşur:
 
-| EXE | Hedef | Çalışma Yeri | Yaptıkları |
+| EXE / DMG | Hedef | Çalışma Yeri | Yaptıkları |
 |---|---|---|---|
-| `RdpVirtualBoxApp-Server-vX.X.X.exe` | IT Admin | Windows Server (elevated) | RDS rolleri, RemoteApp yayını, sertifika, lisans tespiti, Guacamole/Tailscale/Cloudflare fallback |
+| `RdpVirtualBoxApp-Server-vX.X.X.exe` | IT Admin | Windows Server (elevated) | RDS rolleri, RemoteApp yayını, sertifika, lisans tespiti, Guacamole/Tailscale/Cloudflare fallback, Probe REST API |
 | `RdpVirtualBoxApp-Client-vX.X.X.exe` | Son kullanıcı | Windows 10/11 | Sunucu tespiti, uygulama seçimi, `.rdp` üretimi, Start Menu kısayolu, web kısayolu |
+| `RdpVirtualBoxApp-Client-macOS-vX.X.X.dmg` | Son kullanıcı | macOS 12+ | SwiftUI 4 adımlı sihirbaz, Keychain entegrasyonu, Microsoft RDP entegrasyonu, HTML5 launcher |
 
 Sıralama önemlidir: **Önce Server kurulur, sonra Client dağıtılır.**
 
@@ -47,7 +48,8 @@ Sıralama önemlidir: **Önce Server kurulur, sonra Client dağıtılır.**
 - **PWA manifest** desteği — Edge/Chrome üzerinden "uygulamayı yükle".
 - **WinForms wizard** — modern Aero arayüzü, Türkçe varsayılan.
 - **Otomatik log + rollback** — kurulum hata verirse kısmi kurulumları geri alır.
-- **CI/CD** — GitHub Actions ile `windows-latest` runner üzerinde otomatik derleme.
+- **CI/CD** — GitHub Actions ile `windows-latest` ve `macos-latest` runner'ları üzerinde otomatik derleme.
+- **macOS desteği** — SwiftUI tabanlı yerel istemci (DMG) + Web Modu (HTML5) her iki yol da kullanılabilir.
 
 ---
 
@@ -86,7 +88,18 @@ RdpVirtualBoxApp-Client-v1.0.0.exe
 #    4. İnceleme + Install
 ```
 
-Daha fazla bilgi için: [docs/client-setup-guide.md](docs/client-setup-guide.md)
+Daha fazla bilgi için: [docs/client-setup-guide.md](docs/client-setup-guide.md) — Windows istemcisi için.
+
+### macOS Client Kurulumu
+
+```bash
+# 1. Releases sayfasından RdpVirtualBoxApp-Client-macOS-vX.X.X.dmg indirin
+# 2. Çift tıklayıp Rdp Virtual Box App.app'i Applications'a sürükleyin
+# 3. App Store'dan Microsoft Remote Desktop yükleyin
+# 4. Uygulamayı açıp 4 adımlı SwiftUI sihirbazını takip edin
+```
+
+Daha fazla bilgi için: [docs/macos-setup-guide.md](docs/macos-setup-guide.md)
 
 ---
 

@@ -7,6 +7,31 @@ Versiyonlama [Semantic Versioning](https://semver.org/) kurallarına uyar.
 
 ---
 
+## [1.1.0] - 2026-08-20
+
+### Eklenenler (Added)
+
+- **macOS Native Client (SwiftUI)** — `src/swift/RdpVirtualBoxApp/` altinda Swift Package Manager ile gelistirilen 4 adimlik sihirbaz. macOS 12+ (Monterey) uzerinde calisir.
+- **macOS DMG build pipeline** — `build/make-dmg.sh` script'i `swift build` ciktisini `.app` bundle'a cevirip DMG imaj olusturur.
+- **Keychain Services entegrasyonu** — Windows Credential Manager'in macOS karsiligi; `SecItem*` API ile generic password tipinde credential saklar. Target formati PowerShell ile ayni (`RdpVirtualBoxApp:<server>:<appId>`).
+- **Microsoft Remote Desktop entegrasyonu** — `rdp://` URL semasi ile MS RDP.app'i tetikler; `.rdp` dosyasi `~/Documents/RdpVirtualBoxApp/` altina yazilir.
+- **SwiftUI wizard view'lari** — WizardView, Step1ServerInfo, Step2ProbeResults, Step3AppSelection, Step4Review.
+- **Localizable.strings** — Turkce (varsayilan) + Ingilizce fallback.
+- **Sunucu tarafi Probe REST API** — `src/powershell/server/ProbeApi.ps1`. macOS istemcisi WinRM yerine HTTPS/Bearer uzerinden sunucuyu tarar. JSON semasi mevcut ServerProbe.ps1 ile bire bir uyumlu.
+- **GitHub Actions `build-macos` job** — `macos-latest` runner'i uzerinde `swift build` + `swift test` + DMG olusturma. `rdp-virtual-box-app-macos` artifact'i olarak 30 gun saklanir.
+
+### Degisenler (Changed)
+
+- `docs/client-requirements.md` — macOS bolumu "resmi olarak desteklenmiyor" ifadesinden "resmi olarak desteklenir (1.1.0+)" ifadesine guncellendi.
+- `docs/client-setup-guide.md` — macOS Web Modu kurulum rehberi eklendi.
+- `.github/workflows/build.yml` — `build-macos` job'u eklendi (paralel Windows build ile).
+
+### Belgeler (Documentation)
+
+- `docs/macos-setup-guide.md` — Yeni; adim adim macOS kurulum kilavuzu.
+
+---
+
 ## [1.0.0] - 2026-08-19
 
 İlk resmi sürüm. `Rdp Virtual Box App` ürününün ilk kararlı release'i.
