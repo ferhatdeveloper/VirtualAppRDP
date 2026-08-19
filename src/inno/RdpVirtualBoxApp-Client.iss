@@ -229,10 +229,7 @@ begin
 
   if Missing <> '' then
   begin
-    MsgBox('The setup cannot continue because the following prerequisites are missing:' +
-           #13#10#13#10 + Missing + #13#10 +
-           'Please update Windows or install the missing components and try again.',
-           mbCriticalError, MB_OK);
+    MsgBox('The setup cannot continue because the following prerequisites are missing:' + #13 + #10 + #13 + #10 + Missing + #13 + #10 + 'Please update Windows or install the missing components and try again.', mbCriticalError, MB_OK);
     Result := False;
   end;
 end;

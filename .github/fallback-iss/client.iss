@@ -57,5 +57,5 @@ Filename: "{app}\powershell\SetupUI.ps1"; Description: "Launch the Setup Wizard"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\RdpVirtualBoxApp"
-Type: filesandordirs; Name: "{userlocalappdata}\RdpVirtualBoxApp"
+Type: filesandordirs; Name: "{localappdata}\RdpVirtualBoxApp"
 Type: filesandordirs; Name: "{userdocs}\RdpVirtualBoxApp"
