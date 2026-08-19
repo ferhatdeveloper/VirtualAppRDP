@@ -1,8 +1,8 @@
 [Setup]
 AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
 AppName=Rdp Virtual Box App
-AppVersion=1.0.0
-AppVerName=Rdp Virtual Box App 1.0.0
+AppVersion=1.0.1
+AppVerName=Rdp Virtual Box App 1.0.1
 AppPublisher=Rdp Virtual Box App
 AppPublisherURL=https://github.com/ferhatdeveloper/VirtualAppRDP
 AppSupportURL=https://github.com/ferhatdeveloper/VirtualAppRDP/issues
@@ -19,10 +19,10 @@ PrivilegesRequiredOverridesAllowed=dialog
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.0
+OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.1
 Compression=lzma2/ultra64
 SolidCompression=yes
-VersionInfoVersion=1.0.0
+VersionInfoVersion=1.0.1
 VersionInfoCompany=Rdp Virtual Box App
 VersionInfoDescription=Rdp Virtual Box App Client Setup
 VersionInfoProductName=Rdp Virtual Box App Client

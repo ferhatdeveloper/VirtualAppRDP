@@ -155,11 +155,6 @@ jobs:
           chmod 777 build build/output output 2>/dev/null || true
           # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          # Debug: .iss icindeki MyAppVersion satirini goster
-          echo "=== DEBUG: MyAppVersion satir ==="
-          grep -n "MyAppVersion" src/inno/RdpVirtualBoxApp-Client.iss
-          echo "=== DEBUG: MyAppVersion satir bytes ==="
-          grep "MyAppVersion" src/inno/RdpVirtualBoxApp-Client.iss | head -2 | xxd | head -5
           # Önce orijinal Client.iss'i dene
           if docker run --rm -i --user 1000:1000 \
                -v "$(pwd):/work" \

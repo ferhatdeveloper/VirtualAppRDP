@@ -51,7 +51,7 @@ WizardImageFile=..\assets\server\server-banner.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 ; Output
-OutputBaseFilename=RdpVirtualBoxApp-Server-v{#MyAppVersion}
+OutputBaseFilename=RdpVirtualBoxApp-Server-v1.0.1
 ; Misc
 AppMutex=RdpVirtualBoxApp-Server-Setup-Mutex
 ; Min Windows version: Windows Server 2016 / Windows 10 1607
