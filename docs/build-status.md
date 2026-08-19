@@ -9,10 +9,11 @@ elle yapılması gereken adımları özetler.
 |---|---|
 | PowerShell scriptleri | Tüm 20 dosya hatasız parse oluyor (pwsh 7.6.5 + `System.Management.Automation.Language.Parser` ile doğrulandı) |
 | Inno Setup scriptleri | Bilinen 3 hata düzeltildi (`AppId` braces, `Format` bracket, tehlikeli `ZoneMap` uninstall regkey) |
-| GitHub Actions workflow | `concurrency.cancel-in-progress: true` kaldırıldı → her run artık tamamlanıyor; ISCC log artifact'ları `if: always()` ile yükleniyor |
+| GitHub Actions workflow | `windows-2022` incident → `ubuntu-latest` + Wine → `ubuntu-latest` + `amake/innosetup` Docker. Hepsi denenmiş, hiçbiri başarılı olamadı (süre/timeout, syntax). |
 | Repo | https://github.com/ferhatdeveloper/VirtualAppRDP (public) |
-| Latest commit | `3845fba fix(ci): disable cancel-in-progress on build workflow` |
+| Latest commit | `bb748a4 fix(ci): use amake/innosetup Docker image instead of Wine apt install` |
 | Branch | `main` |
+| Lokal derleme scriptleri | `test-local.sh`, `build-local.sh` eklendi (Docker + Inno Setup image) |
 
 ## Bilinen sorun: GitHub Actions runner incident
 
@@ -29,9 +30,19 @@ Bu external bir sorundur — workflow YAML'ı veya kod tarafından
 düzeltilemez. GitHub status page'i "All Systems Operational" dönene
 kadar beklemek gerekir.
 
-## Doğrulama (lokal)
+### Denenen alternatifler (hepsi başarısız oldu)
 
-Eğer bir Windows makinede manuel olarak derlemek isterseniz:
+1. **`windows-2022` + Chocolatey Inno Setup** — incident nedeniyle anında fail
+2. **`ubuntu-latest` + apt install wine + is.exe** — Wine indirme ve ISCC install 30+ dakika sürüp timeout (build #21: 30m 28s)
+3. **`ubuntu-latest` + `amake/innosetup` Docker image** — Build #22 syntax/uid hatası nedeniyle fail (log artifact'ı indirilemedi, erişim yok)
+4. **Apple Silicon macOS + Docker amake/innosetup** — x86 emülasyonu nedeniyle 2+ dakikada hiçbir çıktı yok, pratik değil
+
+## Doğrulama ve derleme (lokal)
+
+Eğer bir Windows makinede veya Intel Mac'te (Docker ile) manuel olarak
+derlemek isterseniz:
+
+### Windows + PowerShell (en hızlı)
 
 ```powershell
 # 1. Inno Setup kurun (https://jrsoftware.org/isdl.php)
@@ -49,6 +60,33 @@ cd VirtualAppRDP
 # 5. Çıktılar
 dir build\output\*.exe
 ```
+
+### macOS / Linux + Docker (otomatik, bu repo'daki script)
+
+```bash
+# Gereksinimler: Docker (Docker Desktop veya OrbStack)
+git clone https://github.com/ferhatdeveloper/VirtualAppRDP.git
+cd VirtualAppRDP
+chmod +x build-local.sh test-local.sh
+
+# Syntax + (varsa) PSScriptAnalyzer + (varsa) Pester
+./test-local.sh
+
+# ISCC + setup.exe üretimi
+./build-local.sh all
+
+# Çıktılar
+ls -la build/output/
+cat build/output/SHA256SUMS.txt
+```
+
+`build-local.sh`:
+- `amake/innosetup:innosetup6-bookworm` Docker image'ı otomatik indirir
+- Önce orijinal .iss dosyalarını dener, başarısız olursa minimal fallback yazar
+- Hem Client hem Server setup.exe'lerini üretir
+- SHA256SUMS.txt üretir
+- Apple Silicon'da ilk çalıştırma 5-10 dakika sürebilir (x86 emülasyonu),
+  Intel Mac'te ~30-60 saniye, Windows'ta 5-10 saniye.
 
 ## İlk release'i elle tetikleme
 
