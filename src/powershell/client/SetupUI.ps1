@@ -373,14 +373,14 @@ function New-HelpButton {
 function New-Step1 {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
+        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Panel,
         [Parameter(Mandatory)][hashtable] $State,
         [System.Windows.Forms.Button] $NextButton,
         [System.Windows.Forms.Button] $ProbeButton,
         [System.Windows.Forms.ToolTip] $ToolTip
     )
 
-    $Host.Controls.Clear()
+    $Panel.Controls.Clear()
     $p = $State.Palette
     $s = $State.Strings
 
@@ -400,29 +400,29 @@ function New-Step1 {
         $font.Dispose()
         $brush.Dispose()
     }
-    $Host.Controls.Add($logo)
+    $Panel.Controls.Add($logo)
 
     # Title block
-    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 100 -Y 12 -Width 480 -Height 28 -Parent $Host
-    New-Label -Text ($s.StepLabelFormat -f 1, $s.Step1Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 100 -Y 42 -Width 480 -Height 20 -Parent $Host
+    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 100 -Y 12 -Width 480 -Height 28 -Parent $Panel
+    New-Label -Text ($s.StepLabelFormat -f 1, $s.Step1Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 100 -Y 42 -Width 480 -Height 20 -Parent $Panel
 
     # Form fields
     $yBase = 90
-    $lblIp = New-Label -Text $s.ServerIpLabel -X 20 -Y $yBase -Width 150 -Height 23 -Parent $Host
-    $tbIp  = New-TextBox -X 180 -Y $yBase -Width 380 -Parent $Host
+    $lblIp = New-Label -Text $s.ServerIpLabel -X 20 -Y $yBase -Width 150 -Height 23 -Parent $Panel
+    $tbIp  = New-TextBox -X 180 -Y $yBase -Width 380 -Parent $Panel
 
-    $lblPort = New-Label -Text $s.PortLabel -X 20 -Y ($yBase + 35) -Width 150 -Height 23 -Parent $Host
-    $tbPort  = New-TextBox -X 180 -Y ($yBase + 35) -Width 120 -Parent $Host
+    $lblPort = New-Label -Text $s.PortLabel -X 20 -Y ($yBase + 35) -Width 150 -Height 23 -Parent $Panel
+    $tbPort  = New-TextBox -X 180 -Y ($yBase + 35) -Width 120 -Parent $Panel
     $tbPort.Text = '3389'
 
-    $lblUser = New-Label -Text $s.UsernameLabel -X 20 -Y ($yBase + 70) -Width 150 -Height 23 -Parent $Host
-    $tbUser  = New-TextBox -X 180 -Y ($yBase + 70) -Width 380 -Parent $Host
+    $lblUser = New-Label -Text $s.UsernameLabel -X 20 -Y ($yBase + 70) -Width 150 -Height 23 -Parent $Panel
+    $tbUser  = New-TextBox -X 180 -Y ($yBase + 70) -Width 380 -Parent $Panel
 
-    $lblPass = New-Label -Text $s.PasswordLabel -X 20 -Y ($yBase + 105) -Width 150 -Height 23 -Parent $Host
-    $tbPass  = New-TextBox -X 180 -Y ($yBase + 105) -Width 380 -UseSystemPasswordChar -Parent $Host
+    $lblPass = New-Label -Text $s.PasswordLabel -X 20 -Y ($yBase + 105) -Width 150 -Height 23 -Parent $Panel
+    $tbPass  = New-TextBox -X 180 -Y ($yBase + 105) -Width 380 -UseSystemPasswordChar -Parent $Panel
 
     # Probe button (manual trigger, doesn't gate the wizard).
-    $probeBtn = New-Button -Text $s.ProbeButton -X 180 -Y ($yBase + 145) -Width 150 -BackColor $p.Accent -Parent $Host
+    $probeBtn = New-Button -Text $s.ProbeButton -X 180 -Y ($yBase + 145) -Width 150 -BackColor $p.Accent -Parent $Panel
     $probeBtn.Add_Click({
         if (-not (Test-IpAddress -Value $tbIp.Text)) {
             [System.Windows.Forms.MessageBox]::Show($s.InvalidIp, $s.ErrorTitle, 'OK', 'Error') | Out-Null
@@ -470,19 +470,19 @@ function New-Step1 {
 function New-Step2 {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
+        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Panel,
         [Parameter(Mandatory)][hashtable] $State,
         [System.Windows.Forms.Button] $BackButton,
         [System.Windows.Forms.Button] $NextButton,
         [System.Windows.Forms.ToolTip] $ToolTip
     )
 
-    $Host.Controls.Clear()
+    $Panel.Controls.Clear()
     $p = $State.Palette
     $s = $State.Strings
 
-    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 20 -Y 12 -Width 560 -Height 28 -Parent $Host
-    New-Label -Text ($s.StepLabelFormat -f 2, $s.Step2Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 20 -Y 42 -Width 560 -Height 20 -Parent $Host
+    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 20 -Y 12 -Width 560 -Height 28 -Parent $Panel
+    New-Label -Text ($s.StepLabelFormat -f 2, $s.Step2Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 20 -Y 42 -Width 560 -Height 20 -Parent $Panel
 
     # DataGridView: Component | Status | Value
     $grid = New-Object System.Windows.Forms.DataGridView
@@ -503,7 +503,7 @@ function New-Step2 {
     $grid.EnableHeadersVisualStyles = $false
     $grid.ColumnHeadersDefaultCellStyle.Font = (New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold))
     $grid.ColumnHeadersDefaultCellStyle.BackColor = [System.Drawing.Color]::FromArgb(230, 230, 230)
-    $Host.Controls.Add($grid)
+    $Panel.Controls.Add($grid)
 
     # Progress bar (shown only during probing).
     $progress = New-Object System.Windows.Forms.ProgressBar
@@ -512,16 +512,16 @@ function New-Step2 {
     $progress.Style    = 'Marquee'
     $progress.MarqueeAnimationSpeed = 30
     $progress.Visible  = $false
-    $Host.Controls.Add($progress)
+    $Panel.Controls.Add($progress)
 
     # Recommendations RichTextBox
-    New-Label -Text $s.Recommendations -Font $p.FontBody -X 20 -Y 320 -Width 200 -Height 20 -Parent $Host
+    New-Label -Text $s.Recommendations -Font $p.FontBody -X 20 -Y 320 -Width 200 -Height 20 -Parent $Panel
     $rtb = New-Object System.Windows.Forms.RichTextBox
     $rtb.Location = New-Object System.Drawing.Point(20, 345)
     $rtb.Size     = New-Object System.Drawing.Size(560, 80)
     $rtb.ReadOnly = $true
     $rtb.BackColor = [System.Drawing.Color]::White
-    $Host.Controls.Add($rtb)
+    $Panel.Controls.Add($rtb)
 
     $State['_probeGrid']    = $grid
     $State['_probeProgress'] = $progress
@@ -586,21 +586,21 @@ function Populate-Step2 {
 function New-Step3 {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
+        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Panel,
         [Parameter(Mandatory)][hashtable] $State,
         [System.Windows.Forms.Button] $BackButton,
         [System.Windows.Forms.Button] $NextButton
     )
 
-    $Host.Controls.Clear()
+    $Panel.Controls.Clear()
     $p = $State.Palette
     $s = $State.Strings
 
-    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 20 -Y 12 -Width 560 -Height 28 -Parent $Host
-    New-Label -Text ($s.StepLabelFormat -f 3, $s.Step3Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 20 -Y 42 -Width 560 -Height 20 -Parent $Host
+    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 20 -Y 12 -Width 560 -Height 28 -Parent $Panel
+    New-Label -Text ($s.StepLabelFormat -f 3, $s.Step3Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 20 -Y 42 -Width 560 -Height 20 -Parent $Panel
 
     # Applications list
-    New-Label -Text $s.ChooseApps -X 20 -Y 80 -Width 560 -Height 20 -Parent $Host
+    New-Label -Text $s.ChooseApps -X 20 -Y 80 -Width 560 -Height 20 -Parent $Panel
     $clb = New-Object System.Windows.Forms.CheckedListBox
     $clb.Location = New-Object System.Drawing.Point(20, 105)
     $clb.Size     = New-Object System.Drawing.Size(560, 150)
@@ -613,14 +613,14 @@ function New-Step3 {
         [void]$clb.Items.Add('(Sunucuda tespit edilen uygulama yok)')
         $clb.Enabled = $false
     }
-    $Host.Controls.Add($clb)
+    $Panel.Controls.Add($clb)
 
     # Access type radios
     $gbAccess = New-Object System.Windows.Forms.GroupBox
     $gbAccess.Text  = $s.AccessTypeLabel
     $gbAccess.Location = New-Object System.Drawing.Point(20, 265)
     $gbAccess.Size  = New-Object System.Drawing.Size(270, 100)
-    $Host.Controls.Add($gbAccess)
+    $Panel.Controls.Add($gbAccess)
 
     $rbNative = New-Object System.Windows.Forms.RadioButton
     $rbNative.Text = $s.NativeRdp
@@ -646,7 +646,7 @@ function New-Step3 {
     $gbCred.Text  = $s.CredentialLabel
     $gbCred.Location = New-Object System.Drawing.Point(310, 265)
     $gbCred.Size  = New-Object System.Drawing.Size(270, 100)
-    $Host.Controls.Add($gbCred)
+    $Panel.Controls.Add($gbCred)
 
     $rbAsk = New-Object System.Windows.Forms.RadioButton
     $rbAsk.Text = $s.AskEveryTime
@@ -669,8 +669,8 @@ function New-Step3 {
     $gbCred.Controls.Add($rbEmbed)
 
     # Custom app path
-    New-Label -Text $s.CustomAppPath -X 20 -Y 375 -Width 560 -Height 20 -Parent $Host
-    $tbCustom = New-TextBox -X 20 -Y 400 -Width 560 -Parent $Host
+    New-Label -Text $s.CustomAppPath -X 20 -Y 375 -Width 560 -Height 20 -Parent $Panel
+    $tbCustom = New-TextBox -X 20 -Y 400 -Width 560 -Parent $Panel
 
     $State['_clb']      = $clb
     $State['_rbNative'] = $rbNative
@@ -726,21 +726,21 @@ function Capture-Step3 {
 function New-Step4 {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
+        [Parameter(Mandatory)][System.Windows.Forms.Panel] $Panel,
         [Parameter(Mandatory)][hashtable] $State,
         [System.Windows.Forms.Button] $BackButton,
         [System.Windows.Forms.Button] $InstallButton,
         [System.Windows.Forms.Button] $CancelButton
     )
 
-    $Host.Controls.Clear()
+    $Panel.Controls.Clear()
     $p = $State.Palette
     $s = $State.Strings
 
-    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 20 -Y 12 -Width 560 -Height 28 -Parent $Host
-    New-Label -Text ($s.StepLabelFormat -f 4, $s.Step4Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 20 -Y 42 -Width 560 -Height 20 -Parent $Host
+    New-Label -Text $s.FormTitle -Font $p.FontTitle -ForeColor $p.Text -X 20 -Y 12 -Width 560 -Height 28 -Parent $Panel
+    New-Label -Text ($s.StepLabelFormat -f 4, $s.Step4Title) -Font $p.FontBody -ForeColor $p.SubtleText -X 20 -Y 42 -Width 560 -Height 20 -Parent $Panel
 
-    New-Label -Text $s.SummaryLabel -X 20 -Y 80 -Width 560 -Height 20 -Parent $Host
+    New-Label -Text $s.SummaryLabel -X 20 -Y 80 -Width 560 -Height 20 -Parent $Panel
 
     $rtb = New-Object System.Windows.Forms.RichTextBox
     $rtb.Location = New-Object System.Drawing.Point(20, 105)
@@ -748,7 +748,7 @@ function New-Step4 {
     $rtb.ReadOnly = $true
     $rtb.BackColor = [System.Drawing.Color]::White
     $rtb.Font = New-Object System.Drawing.Font('Consolas', 9)
-    $Host.Controls.Add($rtb)
+    $Panel.Controls.Add($rtb)
 
     # Install progress
     $progress = New-Object System.Windows.Forms.ProgressBar
@@ -758,7 +758,7 @@ function New-Step4 {
     $progress.Minimum  = 0
     $progress.Maximum  = 100
     $progress.Value    = 0
-    $Host.Controls.Add($progress)
+    $Panel.Controls.Add($progress)
 
     $State['_reviewRtb']     = $rtb
     $State['_installProgress'] = $progress
@@ -923,11 +923,11 @@ function Show-ClientWizard {
                     $probe = Invoke-FullServerProbe -Ip $state.Server.Ip -State $state
                     $state.Probe = $probe
 
-                    New-Step2 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip
+                    New-Step2 -Panel $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip
                     Populate-Step2 -State $state
                 }
                 2 {
-                    New-Step3 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext
+                    New-Step3 -Panel $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext
                 }
                 3 {
                     Capture-Step3 -State $state
@@ -935,7 +935,7 @@ function Show-ClientWizard {
                         $ans = [System.Windows.Forms.MessageBox]::Show($strings.EmbedWarning, $strings.WarningTitle, 'YesNo', 'Warning')
                         if ($ans -ne 'Yes') { return }
                     }
-                    New-Step4 -Host $hostPanel -State $state -BackButton $btnBack -InstallButton $btnInstall -CancelButton $btnCancel
+                    New-Step4 -Panel $hostPanel -State $state -BackButton $btnBack -InstallButton $btnInstall -CancelButton $btnCancel
                     Populate-Step4 -State $state
                     $btnNext.Visible     = $false
                     $btnInstall.Visible  = $true
@@ -959,8 +959,8 @@ function Show-ClientWizard {
             if ($state.CurrentStep -le 1) { return }
 
             switch ($state.CurrentStep) {
-                3 { New-Step2 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip; Populate-Step2 -State $state }
-                4 { New-Step3 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext; $btnInstall.Visible = $false; $btnNext.Visible = $true }
+                3 { New-Step2 -Panel $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip; Populate-Step2 -State $state }
+                4 { New-Step3 -Panel $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext; $btnInstall.Visible = $false; $btnNext.Visible = $true }
             }
             $state.CurrentStep--
             Set-AeroTheme -Control $hostPanel
@@ -1043,7 +1043,7 @@ function Show-ClientWizard {
         Write-SetupLog -Message ("Wizard closed at step {0} with DialogResult {1}" -f $state.CurrentStep, $form.DialogResult)
     })
 
-    New-Step1 -Host $hostPanel -State $state -NextButton $btnNext -ProbeButton $null -ToolTip $tooltip
+    New-Step1 -Panel $hostPanel -State $state -NextButton $btnNext -ProbeButton $null -ToolTip $tooltip
 
     Set-AeroTheme -Control $form
     $form.Topmost = $false
