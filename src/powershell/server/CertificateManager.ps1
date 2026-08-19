@@ -93,7 +93,7 @@ param(
 # ---------------------------------------------------------------------------
 $script:RdpSelfSignedStore = 'Cert:\LocalMachine\Remote Desktop'
 
-function Initialize-CertificateLog {
+function Set-CertificateLog {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -108,6 +108,9 @@ function Initialize-CertificateLog {
         New-Item -Path $Path -ItemType File -Force | Out-Null
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Initialize-CertificateLog -Value Set-CertificateLog -Scope Global -Force
 
 function Write-CertificateLogEntry {
     [CmdletBinding()]
@@ -196,7 +199,7 @@ function New-RdsCertificate {
         $LogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\certificate-manager.log'
     }
 
-    Initialize-CertificateLog -Path $LogPath
+    Set-CertificateLog -Path $LogPath
     $script:CertLogPath = $LogPath
 
     if ($Mode -eq 'SelfSigned' -and -not $ServerFqdn) {

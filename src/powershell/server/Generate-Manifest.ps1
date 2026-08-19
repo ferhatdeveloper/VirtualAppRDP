@@ -195,7 +195,7 @@ $ErrorActionPreference = 'Stop'
 # ---------------------------------------------------------------------------
 $script:ManifestLogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\generate-manifest.log'
 
-function Initialize-ManifestLog {
+function Set-ManifestLog {
     [CmdletBinding()]
     param([Parameter(Mandatory)] [string] $Path)
 
@@ -207,6 +207,9 @@ function Initialize-ManifestLog {
         New-Item -Path $Path -ItemType File -Force | Out-Null
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Initialize-ManifestLog -Value Set-ManifestLog -Scope Global -Force
 
 function Write-ManifestLog {
     [CmdletBinding()]
@@ -233,7 +236,7 @@ function Write-ManifestLog {
     }
 }
 
-Initialize-ManifestLog -Path $script:ManifestLogPath
+Set-ManifestLog -Path $script:ManifestLogPath
 
 # ---------------------------------------------------------------------------
 # Server detection helpers

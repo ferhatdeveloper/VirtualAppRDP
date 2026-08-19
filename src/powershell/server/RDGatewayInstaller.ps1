@@ -71,7 +71,7 @@ param(
 $script:DefaultCapName = 'RdpVirtualBoxApp-CAP'
 $script:DefaultRapName = 'RdpVirtualBoxApp-RAP'
 
-function Initialize-RDGatewayLog {
+function Set-RDGatewayLog {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -83,6 +83,9 @@ function Initialize-RDGatewayLog {
         New-Item -Path $Path -ItemType File -Force | Out-Null
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Initialize-RDGatewayLog -Value Set-RDGatewayLog -Scope Global -Force
 
 function Write-RDGatewayLogEntry {
     [CmdletBinding()]
@@ -148,7 +151,7 @@ function Install-RDGateway {
         $LogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\rd-gateway-installer.log'
     }
 
-    Initialize-RDGatewayLog -Path $LogPath
+    Set-RDGatewayLog -Path $LogPath
     $script:RdgLogPath = $LogPath
 
     try {
@@ -274,7 +277,7 @@ function Uninstall-RDGateway {
         $LogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\rd-gateway-installer.log'
     }
 
-    Initialize-RDGatewayLog -Path $LogPath
+    Set-RDGatewayLog -Path $LogPath
     $script:RdgLogPath = $LogPath
 
     try {

@@ -1086,11 +1086,13 @@ Export-ModuleMember -Function @(
 
 if ($MyInvocation.InvocationName -ne '.' -and $MyInvocation.MyCommand.Path -and $MyInvocation.MyCommand.Path.EndsWith('.ps1')) {
     # Betik olarak calistirildi: ornek cikti uretiyoruz (etkilesimli mod).
-    Write-Host "ServerProbe.ps1 modul halinde yuklenmedi. Ornek kullanim icin:"
-    Write-Host ""
-    Write-Host "  Import-Module ./ServerProbe.ps1 -Force"
-    Write-Host "  `$cred = Get-Credential"
-    Write-Host "  `$probe = Invoke-ServerProbe -Server '192.168.0.106' -Credential `$cred"
-    Write-Host "  Format-ProbeResult -ProbeResult `$probe"
-    Write-Host "  `$probe | ConvertTo-Json -Depth 8"
+    # Use Write-Information so the output is captured by the standard
+    # information stream instead of bypassing PSScriptAnalyzer checks.
+    Write-Information -MessageData "ServerProbe.ps1 modul halinde yuklenmedi. Ornek kullanim icin:" -InformationAction Continue
+    Write-Information -MessageData "" -InformationAction Continue
+    Write-Information -MessageData "  Import-Module ./ServerProbe.ps1 -Force" -InformationAction Continue
+    Write-Information -MessageData "  `$cred = Get-Credential" -InformationAction Continue
+    Write-Information -MessageData "  `$probe = Invoke-ServerProbe -Server '192.168.0.106' -Credential `$cred" -InformationAction Continue
+    Write-Information -MessageData "  Format-ProbeResult -ProbeResult `$probe" -InformationAction Continue
+    Write-Information -MessageData "  `$probe | ConvertTo-Json -Depth 8" -InformationAction Continue
 }

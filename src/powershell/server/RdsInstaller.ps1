@@ -79,7 +79,7 @@ function Resolve-RdsFeatureName {
     return $Name
 }
 
-function Initialize-RdsInstallerLog {
+function Set-RdsInstallerLog {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -95,6 +95,9 @@ function Initialize-RdsInstallerLog {
         New-Item -Path $Path -ItemType File -Force | Out-Null
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Initialize-RdsInstallerLog -Value Set-RdsInstallerLog -Scope Global -Force
 
 function Write-RdsInstallerLogEntry {
     [CmdletBinding()]
@@ -144,7 +147,7 @@ function Install-RdsRole {
         $LogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\rds-installer.log'
     }
 
-    Initialize-RdsInstallerLog -Path $LogPath
+    Set-RdsInstallerLog -Path $LogPath
     $script:LogPath = $LogPath
 
     $installed = New-Object System.Collections.Generic.List[string]
@@ -265,7 +268,7 @@ function Uninstall-RdsRole {
         $LogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\rds-installer.log'
     }
 
-    Initialize-RdsInstallerLog -Path $LogPath
+    Set-RdsInstallerLog -Path $LogPath
     $script:LogPath = $LogPath
 
     $resolved = foreach ($f in $Features) { Resolve-RdsFeatureName -Name $f }

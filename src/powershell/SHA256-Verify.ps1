@@ -106,7 +106,7 @@ $ErrorActionPreference = 'Stop'
 # ---------------------------------------------------------------------------
 $script:VerifyLogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\sha256-verify.log'
 
-function Initialize-VerifyLog {
+function Set-VerifyLog {
     [CmdletBinding()]
     param([Parameter(Mandatory)] [string] $Path)
 
@@ -118,6 +118,9 @@ function Initialize-VerifyLog {
         New-Item -Path $Path -ItemType File -Force | Out-Null
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Initialize-VerifyLog -Value Set-VerifyLog -Scope Global -Force
 
 function Write-VerifyLog {
     [CmdletBinding()]
@@ -143,7 +146,7 @@ function Write-VerifyLog {
     }
 }
 
-Initialize-VerifyLog -Path $script:VerifyLogPath
+Set-VerifyLog -Path $script:VerifyLogPath
 
 function Resolve-ArtifactRoot {
     [CmdletBinding()]
@@ -351,7 +354,7 @@ function Invoke-Verify {
                 Hash   = $entry.Hash
                 Status = 'Missing'
             })
-            if (-not $Quiet) { Write-Host "$(Resolve-VerifyDisplayName $entry.RelName): FAILED (missing file)" }
+            if (-not $Quiet) { Write-Information -MessageData "$(Resolve-VerifyDisplayName $entry.RelName): FAILED (missing file)" -InformationAction Continue }
             continue
         }
 
@@ -365,7 +368,7 @@ function Invoke-Verify {
                 Status = 'Error'
                 Error  = $_.Exception.Message
             })
-            if (-not $Quiet) { Write-Host "$(Resolve-VerifyDisplayName $entry.RelName): FAILED (hash error)" }
+            if (-not $Quiet) { Write-Information -MessageData "$(Resolve-VerifyDisplayName $entry.RelName): FAILED (hash error)" -InformationAction Continue }
             continue
         }
 
@@ -375,7 +378,7 @@ function Invoke-Verify {
                 Hash   = $entry.Hash
                 Status = 'OK'
             })
-            if (-not $Quiet) { Write-Host "$(Resolve-VerifyDisplayName $entry.RelName): OK" }
+            if (-not $Quiet) { Write-Information -MessageData "$(Resolve-VerifyDisplayName $entry.RelName): OK" -InformationAction Continue }
         } else {
             $failedCount++
             $results.Add([pscustomobject]@{
@@ -384,7 +387,7 @@ function Invoke-Verify {
                 Actual = $actual
                 Status = 'Mismatch'
             })
-            if (-not $Quiet) { Write-Host "$(Resolve-VerifyDisplayName $entry.RelName): FAILED" }
+            if (-not $Quiet) { Write-Information -MessageData "$(Resolve-VerifyDisplayName $entry.RelName): FAILED" -InformationAction Continue }
         }
     }
 

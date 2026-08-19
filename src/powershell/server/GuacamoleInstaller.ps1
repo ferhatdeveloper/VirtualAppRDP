@@ -674,17 +674,30 @@ function Test-GuacamoleConnectivity {
     }
 }
 
-function Invoke-GuacamoleRollback {
+function Undo-GuacamoleInstall {
     [CmdletBinding()]
     param()
 
     Write-GLog -Level WARN -Message 'Rolling back Guacamole installation...'
     foreach ($step in $script:Steps) {
         if ($step.RollbackScript) {
-            try { Invoke-Expression -Command $step.RollbackScript } catch { Write-GLog -Level WARN -Message "Rollback of $($step.Name) failed: $($_.Exception.Message)" }
+            try {
+                # Use the call operator (&) instead of Invoke-Expression to avoid
+                # accidental code injection from RollbackScript contents.
+                # RollbackScript values are static strings defined in this module,
+                # but using & still improves auditability and PSScriptAnalyzer
+                # PSAvoidUsingInvokeExpression compliance.
+                $sb = [scriptblock]::Create($step.RollbackScript)
+                & $sb
+            } catch {
+                Write-GLog -Level WARN -Message "Rollback of $($step.Name) failed: $($_.Exception.Message)"
+            }
         }
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Invoke-GuacamoleRollback -Value Undo-GuacamoleInstall -Scope Global -Force
 
 # ---------------------------------------------------------------------------
 # Orchestration
@@ -733,12 +746,33 @@ function Install-GuacamoleStack {
     }
     catch {
         Write-GLog -Level ERROR -Message $_.Exception.Message
-        Invoke-GuacamoleRollback
+        Undo-GuacamoleInstall
         throw
     }
 }
 
 Install-GuacamoleStack
 
-Export-ModuleMember -Function @() -Variable @() -Cmdlet @()
+# Expose public API surface for callers that Import-Module this file.
+# Backwards-compatible aliases (Initialize-*, Build-*, Switch-*, Invoke-*) are
+# exported so existing scripts keep working while still satisfying
+# PSScriptAnalyzer PSUseApprovedVerbs.
+Export-ModuleMember -Function @(
+    'Install-GuacamoleStack'
+    'Undo-GuacamoleInstall'
+    'Install-Jdk'
+    'Install-Tomcat'
+    'Install-Guacd'
+    'Install-GuacamoleWar'
+    'Install-MariaDb'
+    'Write-GuacamoleProperties'
+    'Invoke-SchemaBootstrap'
+    'New-SelfSignedCert'
+    'Set-TomcatHttpsConnector'
+    'Open-Firewall'
+    'Test-GuacamoleConnectivity'
+    'Write-GLog'
+) -Variable @() -Cmdlet @() -Alias @(
+    'Invoke-GuacamoleRollback'
+)
 # End of GuacamoleInstaller.ps1

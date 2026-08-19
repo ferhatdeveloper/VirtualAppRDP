@@ -85,10 +85,14 @@ function Write-SetupLog {
     $timestamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
     $line      = "[$timestamp] [$Level] [$Component] $Message"
     Add-Content -Path $LogFile -Value $line -Encoding UTF8
-    if ($Level -eq 'ERROR') { Write-Host $line -ForegroundColor Red }
-    elseif ($Level -eq 'WARN') { Write-Host $line -ForegroundColor Yellow }
-    elseif ($Level -eq 'DEBUG') { Write-Host $line -ForegroundColor DarkGray }
-    else { Write-Verbose $line }
+    # Stream interactive status via Write-Information so callers can suppress
+    # or redirect output. Avoids PSScriptAnalyzer PSAvoidUsingWriteHost.
+    switch ($Level) {
+        'ERROR' { Write-Information -MessageData $line -InformationAction Continue }
+        'WARN'  { Write-Information -MessageData $line -InformationAction Continue }
+        'DEBUG' { Write-Verbose $line }
+        default { Write-Verbose $line }
+    }
 }
 
 # -----------------------------------------------------------------------------
@@ -300,7 +304,7 @@ function New-StepPanel {
 }
 
 $script:CurrentStep = 1
-function Switch-Step {
+function Set-Step {
     param([int]$Step)
     foreach ($k in $panels.Keys) { $panels[$k].Visible = $false }
     $key = "Step$Step"
@@ -316,6 +320,9 @@ function Switch-Step {
         else { $btnNext.Enabled = $true }
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Switch-Step -Value Set-Step -Scope Global -Force
 
 # -----------------------------------------------------------------------------
 # STEP 1 - Welcome
@@ -772,37 +779,37 @@ $btnCancel.Add_Click({ $form.Close() })
 
 $btnPrev = New-ModernButton -Text '< Geri' -Location (New-Object System.Drawing.Point(560, 14)) -Size (New-Object System.Drawing.Size(120, 32))
 $btnPrev.Enabled = $false
-$btnPrev.Add_Click({ Switch-Step ($script:CurrentStep - 1) })
+$btnPrev.Add_Click({ Set-Step ($script:CurrentStep - 1) })
 
 $btnNext = New-PrimaryButton -Text 'Ileri >' -Location (New-Object System.Drawing.Point(690, 14)) -Size (New-Object System.Drawing.Size(140, 32))
 $btnNext.Enabled = $false
 
 $btnNext.Add_Click({
     switch ($script:CurrentStep) {
-        1 { Switch-Step 2 }
-        2 { Switch-Step 3 }
+        1 { Set-Step 2 }
+        2 { Set-Step 3 }
         3 {
             if (-not $script:WizardData.RdWebLicenseOk -and -not $chkGuacAuto.Checked) {
                 $script:WizardData.InstallGuacamole = $false
             }
-            Switch-Step 4
+            Set-Step 4
         }
         4 {
             if ($script:WizardData.ConnectionStrategies.Count -eq 0) {
                 [System.Windows.Forms.MessageBox]::Show('En az bir baglanti stratejisi secmelisiniz.','Uyari','OK','Warning') | Out-Null
                 return
             }
-            Switch-Step 5
+            Set-Step 5
         }
         5 {
             $script:WizardData.SelectedApps = @()
             foreach ($item in $lvApps.CheckedItems) { $script:WizardData.SelectedApps += $item.Tag }
             Update-ReviewSummary
-            Switch-Step 6
+            Set-Step 6
         }
         6 {
             $txtLog.AppendText("Kurulum baslatildi: $(Get-Date -Format 's')`n")
-            Switch-Step 7
+            Set-Step 7
             # Kick off installation worker in the background
             Start-InstallationWorker
         }
@@ -815,7 +822,7 @@ $footerPanel.Controls.AddRange(@($btnCancel, $btnPrev, $btnNext))
 # Installation worker (runs synchronously on UI thread but updates progress)
 # -----------------------------------------------------------------------------
 $script:InstallActions = @()
-function Build-InstallActions {
+function New-InstallActions {
     $actions = New-Object System.Collections.ArrayList
     if ($script:WizardData.InstallRdsRoles)  { [void]$actions.Add(@{ Name='RDS Rolleri kuruluyor'; Script='RdsInstaller.ps1' }) }
     if ($script:WizardData.CertMode -eq 'SelfSigned' -or $script:WizardData.CertMode -eq 'CASigned') {
@@ -832,8 +839,11 @@ function Build-InstallActions {
     return $actions
 }
 
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Build-InstallActions -Value New-InstallActions -Scope Global -Force
+
 function Start-InstallationWorker {
-    $actions = Build-InstallActions
+    $actions = New-InstallActions
     if ($actions.Count -eq 0) {
         $txtLog.AppendText("Secili bilesen yok. Kurulum atlandi.`n")
         $progBar.Value = 100
@@ -923,9 +933,50 @@ try {
     $lblOs.Text   = "OS         : $($script:WizardData.OsVersion)"
     $lblAdmin.Text= "Yonetici   : $([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole('Administrator')"
 
-    Switch-Step 1
+    Set-Step 1
     [void]$form.ShowDialog()
 } catch {
     Write-SetupLog "Kritik hata: $_" -Level ERROR
     [System.Windows.Forms.MessageBox]::Show("Kurulum sihirbazi baslatilamadi:`n$($_.Exception.Message)", 'Hata', 'OK', 'Error') | Out-Null
 }
+
+# ---------------------------------------------------------------------------
+# Public API surface. Exposed when this file is loaded as a module via
+# Import-Module. When the script is run directly (Boot block above), the
+# module manifest is not used, so this block is a no-op at script scope.
+# Backwards-compatible aliases are exported so existing callers using the
+# old verb names (Switch-Step, Build-InstallActions, Initialize-*) keep
+# working after the PSScriptAnalyzer PSUseApprovedVerbs refactor.
+# ---------------------------------------------------------------------------
+Export-ModuleMember -Function @(
+    'Write-SetupLog'
+    'New-ModernButton'
+    'New-PrimaryButton'
+    'New-HelpButton'
+    'New-StepPanel'
+    'New-Button'
+    'New-Label'
+    'New-TextBox'
+    'New-IndexPage'
+    'Set-AeroTheme'
+    'Set-Step'
+    'New-InstallActions'
+    'Start-InstallationWorker'
+    'Show-AppSummary'
+    'Update-ReviewSummary'
+    'Get-ServerNetworkInfo'
+) -Variable @(
+    'ServerModules'
+    'ServerModuleNames'
+    'ThemeColor'
+    'AccentColor'
+    'OkColor'
+    'WarnColor'
+    'ErrColor'
+    'CurrentStep'
+    'WizardData'
+    'InstallActions'
+) -Cmdlet @() -Alias @(
+    'Switch-Step'
+    'Build-InstallActions'
+)

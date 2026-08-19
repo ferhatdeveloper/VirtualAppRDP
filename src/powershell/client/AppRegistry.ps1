@@ -78,7 +78,7 @@ function Get-StartMenuShortcutPath {
     return (Join-Path -Path $folder -ChildPath ("{0}.lnk" -f $AppName))
 }
 
-function Initialize-AppRegistryFile {
+function Set-AppRegistryFile {
     [CmdletBinding()]
     param([string] $Path = (Get-AppRegistryPath))
 
@@ -95,6 +95,9 @@ function Initialize-AppRegistryFile {
     ConvertTo-Json -InputObject $seed -Depth 6 | Out-File -FilePath $Path -Encoding utf8 -Force
 }
 
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Initialize-AppRegistryFile -Value Set-AppRegistryFile -Scope Global -Force
+
 # ---------------------------------------------------------------------------
 # Internal read/write helpers (serialized with a mutex-style temp file)
 # ---------------------------------------------------------------------------
@@ -105,7 +108,7 @@ function Read-AppRegistry {
 
     try {
         if (-not (Test-Path -LiteralPath $Path)) {
-            Initialize-AppRegistryFile -Path $Path
+            Set-AppRegistryFile -Path $Path
         }
         $raw = Get-Content -LiteralPath $Path -Raw -Encoding UTF8
         if ([string]::IsNullOrWhiteSpace($raw)) { $raw = '{}' }

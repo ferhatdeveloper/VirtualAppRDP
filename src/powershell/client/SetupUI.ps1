@@ -370,7 +370,7 @@ function New-HelpButton {
 # ---------------------------------------------------------------------------
 # Step 1 - Server information (Welcome / Server)
 # ---------------------------------------------------------------------------
-function Build-Step1 {
+function New-Step1 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
@@ -467,7 +467,7 @@ function Build-Step1 {
 # ---------------------------------------------------------------------------
 # Step 2 - Server probe results.
 # ---------------------------------------------------------------------------
-function Build-Step2 {
+function New-Step2 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
@@ -583,7 +583,7 @@ function Populate-Step2 {
 # ---------------------------------------------------------------------------
 # Step 3 - Application selection + access type + credential mode.
 # ---------------------------------------------------------------------------
-function Build-Step3 {
+function New-Step3 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
@@ -723,7 +723,7 @@ function Capture-Step3 {
 # ---------------------------------------------------------------------------
 # Step 4 - Review and install.
 # ---------------------------------------------------------------------------
-function Build-Step4 {
+function New-Step4 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][System.Windows.Forms.Panel] $Host,
@@ -923,11 +923,11 @@ function Show-ClientWizard {
                     $probe = Invoke-FullServerProbe -Ip $state.Server.Ip -State $state
                     $state.Probe = $probe
 
-                    Build-Step2 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip
+                    New-Step2 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip
                     Populate-Step2 -State $state
                 }
                 2 {
-                    Build-Step3 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext
+                    New-Step3 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext
                 }
                 3 {
                     Capture-Step3 -State $state
@@ -935,7 +935,7 @@ function Show-ClientWizard {
                         $ans = [System.Windows.Forms.MessageBox]::Show($strings.EmbedWarning, $strings.WarningTitle, 'YesNo', 'Warning')
                         if ($ans -ne 'Yes') { return }
                     }
-                    Build-Step4 -Host $hostPanel -State $state -BackButton $btnBack -InstallButton $btnInstall -CancelButton $btnCancel
+                    New-Step4 -Host $hostPanel -State $state -BackButton $btnBack -InstallButton $btnInstall -CancelButton $btnCancel
                     Populate-Step4 -State $state
                     $btnNext.Visible     = $false
                     $btnInstall.Visible  = $true
@@ -959,8 +959,8 @@ function Show-ClientWizard {
             if ($state.CurrentStep -le 1) { return }
 
             switch ($state.CurrentStep) {
-                3 { Build-Step2 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip; Populate-Step2 -State $state }
-                4 { Build-Step3 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext; $btnInstall.Visible = $false; $btnNext.Visible = $true }
+                3 { New-Step2 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext -ToolTip $tooltip; Populate-Step2 -State $state }
+                4 { New-Step3 -Host $hostPanel -State $state -BackButton $btnBack -NextButton $btnNext; $btnInstall.Visible = $false; $btnNext.Visible = $true }
             }
             $state.CurrentStep--
             Set-AeroTheme -Control $hostPanel
@@ -1043,7 +1043,7 @@ function Show-ClientWizard {
         Write-SetupLog -Message ("Wizard closed at step {0} with DialogResult {1}" -f $state.CurrentStep, $form.DialogResult)
     })
 
-    Build-Step1 -Host $hostPanel -State $state -NextButton $btnNext -ProbeButton $null -ToolTip $tooltip
+    New-Step1 -Host $hostPanel -State $state -NextButton $btnNext -ProbeButton $null -ToolTip $tooltip
 
     Set-AeroTheme -Control $form
     $form.Topmost = $false
@@ -1145,6 +1145,9 @@ function Invoke-FullServerProbe {
     try {
         # WinRM/WMI için PSCredential gerekli; State'de yoksa boş credential
         # ile bağlanmaya çalışıp, başarısız olursa stub'a düşeriz.
+        # Empty SecureString is created via the parameterless constructor to
+        # avoid the deprecated ConvertTo-SecureString -AsPlainText path and
+        # the hardcoded 'placeholder' magic string flagged by PSScriptAnalyzer.
         $cred = $null
         if ($State -and $State.ContainsKey('_securePass')) {
             $cred = New-Object System.Management.Automation.PSCredential(
@@ -1152,9 +1155,10 @@ function Invoke-FullServerProbe {
                 [System.Security.SecureString]$State.Server.SecurePassword
             )
         } else {
+            $emptySecure = New-Object System.Security.SecureString
             $cred = New-Object System.Management.Automation.PSCredential(
                 'guest',
-                (ConvertTo-SecureString 'placeholder' -AsPlainText -Force)
+                $emptySecure
             )
         }
         $probe = Invoke-ServerProbe -Server $Ip -Credential $cred -PassThru $true
@@ -1264,7 +1268,7 @@ function Start-ClientInstall {
         if ($script:ClientModulesLoaded.AppRegistry -and $rdpApps.Count -gt 0) {
             $regPath = Get-AppRegistryPath
             if (-not (Test-Path -LiteralPath $regPath)) {
-                $null = Initialize-AppRegistryFile -Path $regPath
+                $null = Set-AppRegistryFile -Path $regPath
             }
             for ($i = 0; $i -lt $selectedApps.Count; $i++) {
                 $app   = $selectedApps[$i]
@@ -1303,3 +1307,11 @@ if ($MyInvocation.InvocationName -and $MyInvocation.MyCommand.Path -like '*Setup
         Write-Error -ErrorRecord $_
     }
 }
+
+# ---------------------------------------------------------------------------
+# Backwards-compatible aliases for PSScriptAnalyzer PSUseApprovedVerbs compliance
+# ---------------------------------------------------------------------------
+Set-Alias -Name Build-Step1 -Value New-Step1 -Scope Global -Force
+Set-Alias -Name Build-Step2 -Value New-Step2 -Scope Global -Force
+Set-Alias -Name Build-Step3 -Value New-Step3 -Scope Global -Force
+Set-Alias -Name Build-Step4 -Value New-Step4 -Scope Global -Force

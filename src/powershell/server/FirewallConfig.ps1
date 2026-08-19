@@ -60,7 +60,7 @@ $script:DefaultRules = @(
     @{ DisplayName = "$script:RulePrefix - WinRM 5986";          Port = 5986; Description = 'WinRM HTTPS (ServerProbe)' }
 )
 
-function Initialize-FirewallLog {
+function Set-FirewallLog {
     [CmdletBinding()]
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -72,6 +72,9 @@ function Initialize-FirewallLog {
         New-Item -Path $Path -ItemType File -Force | Out-Null
     }
 }
+
+# Backwards-compatible alias for PSScriptAnalyzer PSUseApprovedVerbs compliance
+Set-Alias -Name Initialize-FirewallLog -Value Set-FirewallLog -Scope Global -Force
 
 function Write-FirewallLogEntry {
     [CmdletBinding()]
@@ -120,7 +123,7 @@ function Set-RdpVirtualBoxAppFirewall {
         $LogPath = Join-Path -Path $env:ProgramData -ChildPath 'RdpVirtualBoxApp\Logs\firewall-config.log'
     }
 
-    Initialize-FirewallLog -Path $LogPath
+    Set-FirewallLog -Path $LogPath
     $script:FwLogPath = $LogPath
 
     try {
