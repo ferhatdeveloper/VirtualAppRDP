@@ -692,11 +692,22 @@ function Capture-Step3 {
     param([Parameter(Mandatory)][hashtable] $State)
 
     $clb = $State['_clb']
-    $selected = @()
-    foreach ($i in 0..($clb.Items.Count - 1)) {
-        if ($clb.GetItemChecked($i)) { $selected += [string]$clb.Items[$i] }
+    $selected       = @()
+    $selectedObjs   = @()
+    for ($i = 0; $i -lt $clb.Items.Count; $i++) {
+        if ($clb.GetItemChecked($i)) {
+            $item = $clb.Items[$i]
+            $selected += [string]$item
+            $selectedObjs += ([pscustomobject]@{
+                id    = if ($item.alias) { [string]$item.alias } else { [string]$item }
+                alias = if ($item.alias) { [string]$item.alias } else { [string]$item }
+                name  = if ($item.name)  { [string]$item.name  } else { [string]$item }
+                path  = if ($item.path)  { [string]$item.path  } else { '' }
+            })
+        }
     }
-    $State.SelectedApps = $selected
+    $State.SelectedApps        = $selected
+    $State.SelectedAppObjects  = $selectedObjs
 
     if     ($State['_rbNative'].Checked) { $State.AccessType = 'Native' }
     elseif ($State['_rbWeb'].Checked)    { $State.AccessType = 'Web' }
@@ -1049,11 +1060,63 @@ function Start-ClientSetupWizard {
 }
 
 # ---------------------------------------------------------------------------
-# Stub hooks - replaced by the real modules (ServerProbe.ps1 / RdpBuilder.ps1
-# / WebShortcuts.ps1 / AppRegistry.ps1 / Credential.ps1). They live here so
-# the wizard can be loaded and exercised even before those modules are wired
-# in. Each hook logs a clear message and returns a safe placeholder.
+# Module wiring - load the real client-side modules so the wizard hooks can
+# delegate to them. Each Import-Module is guarded: the file is resolved
+# relative to the script root, a missing file logs a warning (the wizard
+# still works in a degraded mode for local testing), and any syntax/runtime
+# error during dot-source is caught and surfaced through Write-SetupLog.
 # ---------------------------------------------------------------------------
+
+function Import-ClientModule {
+    <#
+    .SYNOPSIS
+        Dot-sources a client-side module that lives next to SetupUI.ps1 and
+        returns $true on success, $false on failure. Failures are logged
+        through Write-SetupLog so the wizard can degrade gracefully.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string] $Name
+    )
+
+    $baseDir = $PSScriptRoot
+    if (-not $baseDir -and $MyInvocation.MyCommand.Path) {
+        $baseDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if (-not $baseDir) {
+        $baseDir = (Get-Location).Path
+    }
+    $modulePath = Join-Path -Path $baseDir -ChildPath $Name
+    if (-not (Test-Path -LiteralPath $modulePath)) {
+        Write-SetupLog -Level Warn -Message ("Modül bulunamadı, stub'a düşüyor: {0}" -f $modulePath)
+        return $false
+    }
+    try {
+        . (Get-Item -LiteralPath $modulePath).FullName
+        Write-SetupLog -Message ("Modül yüklendi: {0}" -f $modulePath)
+        return $true
+    } catch {
+        Write-SetupLog -Level Error -Message ("Modül yüklenemedi: {0} -> {1}" -f $modulePath, $_.Exception.Message)
+        return $false
+    }
+}
+
+$script:ClientModulesLoaded = @{
+    ServerProbe = (Import-ClientModule -Name 'ServerProbe.ps1')
+    RdpBuilder  = (Import-ClientModule -Name 'RdpBuilder.ps1')
+    WebShortcuts= (Import-ClientModule -Name 'WebShortcuts.ps1')
+    Credential  = (Import-ClientModule -Name 'Credential.ps1')
+    AppRegistry = (Import-ClientModule -Name 'AppRegistry.ps1')
+    SelfTest    = (Import-ClientModule -Name 'SelfTest.ps1')
+}
+
+# ---------------------------------------------------------------------------
+# Wizard hooks - delegate to the real modules when they are available, and
+# fall back to safe placeholders otherwise. This way the wizard can still be
+# loaded and exercised locally even when running outside the full install
+# layout (eg. Pester tests on a developer workstation).
+# ---------------------------------------------------------------------------
+
 function Invoke-FullServerProbe {
     [CmdletBinding()]
     param(
@@ -1061,20 +1124,56 @@ function Invoke-FullServerProbe {
         [Parameter(Mandatory)][hashtable] $State
     )
 
-    Write-SetupLog -Message ("Invoke-FullServerProbe called for {0} (stub - expecting Ajan C1 module)" -f $Ip)
-    # Default placeholder so the wizard still navigates during local testing.
-    return [pscustomobject]@{
-        server             = $Ip
-        os                 = 'Unknown (probe module not loaded)'
-        reachable          = $true
-        winrm              = $false
-        components         = [pscustomobject]@{
-            RDP_Port = [pscustomobject]@{ status = 'ok';      value = '3389 open' }
-            RDS_Role = [pscustomobject]@{ status = 'warning'; value = 'ServerProbe.ps1 not loaded' }
+    if (-not $script:ClientModulesLoaded.ServerProbe) {
+        Write-SetupLog -Level Warn -Message ("ServerProbe.ps1 yüklü değil; stub sonuç döndürülüyor ({0})" -f $Ip)
+        return [pscustomobject]@{
+            server             = $Ip
+            os                 = 'Unknown (probe module not loaded)'
+            reachable          = $true
+            winrm              = $false
+            components         = [pscustomobject]@{
+                RDP_Port = [pscustomobject]@{ status = 'ok';      value = '3389 open' }
+                RDS_Role = [pscustomobject]@{ status = 'warning'; value = 'ServerProbe.ps1 not loaded' }
+            }
+            existingRemoteApps = @()
+            recommendations    = @('ServerProbe.ps1 modülü yüklenmedi. Ajan C1 çıktısı bekleniyor.')
+            webEndpoint        = $null
         }
-        existingRemoteApps = @()
-        recommendations    = @('ServerProbe.ps1 modülü yüklenmedi. Ajan C1 çıktısı bekleniyor.')
-        webEndpoint        = $null
+    }
+
+    Write-SetupLog -Message ("Invoke-FullServerProbe: {0}" -f $Ip)
+    try {
+        # WinRM/WMI için PSCredential gerekli; State'de yoksa boş credential
+        # ile bağlanmaya çalışıp, başarısız olursa stub'a düşeriz.
+        $cred = $null
+        if ($State -and $State.ContainsKey('_securePass')) {
+            $cred = New-Object System.Management.Automation.PSCredential(
+                [string]$State.Server.Username,
+                [System.Security.SecureString]$State.Server.SecurePassword
+            )
+        } else {
+            $cred = New-Object System.Management.Automation.PSCredential(
+                'guest',
+                (ConvertTo-SecureString 'placeholder' -AsPlainText -Force)
+            )
+        }
+        $probe = Invoke-ServerProbe -Server $Ip -Credential $cred -PassThru $true
+        Write-SetupLog -Message ("Invoke-FullServerProbe tamamlandı: reachable={0} os='{1}' apps={2}" -f $probe.reachable, $probe.os, $probe.existingRemoteApps.Count)
+        return $probe
+    } catch {
+        Write-SetupLog -Level Error -Message ("Invoke-ServerProbe başarısız: {0}" -f $_.Exception.Message)
+        return [pscustomobject]@{
+            server             = $Ip
+            os                 = ''
+            reachable          = $false
+            winrm              = $false
+            components         = [pscustomobject]@{
+                RDP_Port = [pscustomobject]@{ status = 'error'; value = "Probe failed: $($_.Exception.Message)" }
+            }
+            existingRemoteApps = @()
+            recommendations    = @("Sunucu tespiti başarısız: $($_.Exception.Message)")
+            webEndpoint        = $null
+        }
     }
 }
 
@@ -1085,8 +1184,113 @@ function Start-ClientInstall {
         [scriptblock] $ProgressCallback
     )
 
-    Write-SetupLog -Message "Start-ClientInstall stub - delegating to RdpBuilder/WebShortcuts/AppRegistry."
-    return [pscustomobject]@{ Success = $true; Error = ''; OutputDir = $State.OutputDir }
+    $selectedApps = @()
+    if ($State.ContainsKey('SelectedAppObjects') -and $State.SelectedAppObjects) {
+        $selectedApps = @($State.SelectedAppObjects)
+    } elseif ($State.ContainsKey('SelectedApps')) {
+        foreach ($id in @($State.SelectedApps)) {
+            $selectedApps += ([pscustomobject]@{ id = [string]$id; alias = [string]$id; name = [string]$id; path = '' })
+        }
+    }
+    $accessType   = if ($State.ContainsKey('AccessType')) { [string]$State.AccessType } else { 'Native' }
+    $credMode     = if ($State.ContainsKey('CredentialMode')) { [string]$State.CredentialMode } else { 'Ask' }
+
+    Write-SetupLog -Message ("Start-ClientInstall: {0} uygulama, access={1}, cred={2}" -f $selectedApps.Count, $accessType, $credMode)
+
+    if (-not $script:ClientModulesLoaded.RdpBuilder) {
+        Write-SetupLog -Level Warn -Message "RdpBuilder.ps1 yüklü değil; install atlandı (stub)."
+        return [pscustomobject]@{ Success = $false; Error = 'RdpBuilder.ps1 modülü yüklenmedi.'; OutputDir = $State.OutputDir }
+    }
+
+    $outputDir = $State.OutputDir
+    try {
+        if (-not (Test-Path -LiteralPath $outputDir)) {
+            New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+        }
+
+        $endpoint = $null
+        if ($State -and ($State.Probe -as [psobject])) {
+            $endpoint = $State.Probe.webEndpoint
+        }
+        $endpointType = if ($endpoint -and $endpoint.type -in @('RDWeb', 'Guacamole')) { [string]$endpoint.type } else { 'RDWeb' }
+
+        # New-RdpFileForApps hashtable[] istiyor; sunucudan gelen existingRemoteApps
+        # PSCustomObject olduğu için ortak bir forma çeviriyoruz.
+        $rdpApps = @()
+        foreach ($app in $selectedApps) {
+            $rdpApps += @{
+                Alias = if ($app.alias) { [string]$app.alias } else { [string]$app.id }
+                Name  = [string]$app.name
+            }
+        }
+
+        # 1) .rdp dosyaları (Native veya Both modunda)
+        $generatedRdp = @()
+        if ($accessType -in @('Native', 'Both')) {
+            if ($rdpApps.Count -eq 0) {
+                Write-SetupLog -Level Warn -Message "Seçili uygulama yok; .rdp üretimi atlandı."
+            } else {
+                $generatedRdp = @(New-RdpFileForApps -Apps $rdpApps -Server $State.Server.Ip -Username $State.Server.Username -OutputDir $outputDir)
+                Write-SetupLog -Message ("{0} adet .rdp dosyası üretildi." -f $generatedRdp.Count)
+            }
+        }
+
+        # 2) HTML5 web kısayolları (Web veya Both modunda)
+        if ($accessType -in @('Web', 'Both') -and $script:ClientModulesLoaded.WebShortcuts -and $endpoint -and $endpoint.url) {
+            try {
+                $webCount = 0
+                foreach ($app in $selectedApps) {
+                    $null = New-WebShortcutBundle -EndpointType $endpointType -Server $State.Server.Ip -AppName ([string]$app.name) -AppId ([string]$app.id) -WebPath ([string]$endpoint.url) -OutputPath (Join-Path $outputDir 'web')
+                    $webCount++
+                }
+                Write-SetupLog -Message ("{0} adet web kısayolu üretildi." -f $webCount)
+            } catch {
+                Write-SetupLog -Level Warn -Message ("Web kısayolları üretilemedi: {0}" -f $_.Exception.Message)
+            }
+        } elseif ($accessType -in @('Web', 'Both')) {
+            Write-SetupLog -Level Warn -Message "Web modu seçildi ama WebShortcuts.ps1 yüklü değil veya HTML5 endpoint tespit edilmedi; web kısayolları atlandı."
+        }
+
+        # 3) Credential Manager (Save modunda)
+        if ($credMode -eq 'Save' -and $script:ClientModulesLoaded.Credential) {
+            foreach ($app in $selectedApps) {
+                $target = Format-StoredCredentialTarget -Server $State.Server.Ip -AppId ([string]$app.id)
+                $null = New-StoredCredential -Target $target -UserName $State.Server.Username -SecurePassword $State.Server.SecurePassword
+            }
+            Write-SetupLog -Message "Credential Manager kayıtları yazıldı."
+        }
+
+        # 4) AppRegistry'ye uygulama kayıtları
+        if ($script:ClientModulesLoaded.AppRegistry -and $rdpApps.Count -gt 0) {
+            $regPath = Get-AppRegistryPath
+            if (-not (Test-Path -LiteralPath $regPath)) {
+                $null = Initialize-AppRegistryFile -Path $regPath
+            }
+            for ($i = 0; $i -lt $selectedApps.Count; $i++) {
+                $app   = $selectedApps[$i]
+                $rdp   = if ($generatedRdp.Count -gt $i) { $generatedRdp[$i] } else { $null }
+                if (-not $rdp) { continue }
+                $null = Register-App -Id ([string]$app.id) -Name ([string]$app.name) -Server $State.Server.Ip -Port $State.Server.Port -RdpPath $rdp -RemoteAppAlias ([string]$app.alias) -CredentialMode $credMode
+            }
+            Write-SetupLog -Message "AppRegistry güncellendi."
+        }
+
+        # 5) SelfTest (bağlantı doğrulama) - opsiyonel, modül yüklüyse çağrılır
+        if ($script:ClientModulesLoaded.SelfTest) {
+            try {
+                $report = Test-ServerConnection -Server $State.Server.Ip -Port $State.Server.Port
+                Write-SetupLog -Message ("Self-test sonucu: {0}" -f ($report | Out-String))
+            } catch {
+                Write-SetupLog -Level Warn -Message ("Self-test çalıştırılamadı: {0}" -f $_.Exception.Message)
+            }
+        }
+
+        if ($ProgressCallback) { & $ProgressCallback 100 }
+        return [pscustomobject]@{ Success = $true; Error = ''; OutputDir = $outputDir }
+    } catch {
+        Write-SetupLog -Level Error -Message ("Install hata: {0}" -f $_.Exception.Message)
+        return [pscustomobject]@{ Success = $false; Error = $_.Exception.Message; OutputDir = $outputDir }
+    }
 }
 
 # ---------------------------------------------------------------------------

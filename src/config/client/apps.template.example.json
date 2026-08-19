@@ -1,6 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/example.json",
   "_comment": "C2 tarafindan RdpBuilder.ps1 ile birlikte kullanilmak uzere hazirlanmis ornek generic uygulama sablonu. C1 (ServerProbe) kendi apps.template.json dosyasini kullaniyor — bu dosya C2'nin coklu-uygulama dongusunde kullanabilecegi baslangic ornegidir.",
+  "_role": "documentation-example",
+  "_owner": "Ajan C2 (RdpBuilder / WebShortcuts)",
+  "_shares_namespace_with": "apps.template.json",
+  "_resolution": "Ayri tutulur. apps.template.json = ServerProbe.ps1 fallback sablonu (C1 tarafindan okunur). apps.template.example.json = gelistiriciler icin referans ornek (C2 tarafindan aktif olarak okunmaz; sadece ornek amacli).",
   "version": "1.0.0",
   "description": "Rdp Virtual Box App - Generic uygulama sablonu. Sadece ozel/manuel uygulama ekleme icin fallback olarak kullanilir. Sunucudaki gercek liste ServerProbe.Get-RDRemoteApp ile gelir.",
   "apps": [

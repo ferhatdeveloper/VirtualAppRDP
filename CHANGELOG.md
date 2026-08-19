@@ -10,113 +10,147 @@ Versiyonlama [Semantic Versioning](https://semver.org/) kurallarına uyar.
 ## [1.0.0] - 2026-08-19
 
 İlk resmi sürüm. `Rdp Virtual Box App` ürününün ilk kararlı release'i.
+Server-side ve client-side kurulum, 5 farklı bağlantı stratejisi ve HTML5 fallback içerir.
+
+### Entegrasyon (Integration)
+
+- `SetupUI.ps1` içindeki `Invoke-FullServerProbe` ve `Start-ClientInstall` stub'ları gerçek
+  modüllere (ServerProbe.ps1, RdpBuilder.ps1, WebShortcuts.ps1, Credential.ps1,
+  AppRegistry.ps1, SelfTest.ps1) bağlandı. Modül yükleme `Import-ClientModule` yardımcısı
+  ile try/catch korumalı şekilde yapılıyor; her modülün yüklenme durumu
+  `$script:ClientModulesLoaded` hashtable'ında izleniyor. Yüklenemeyen modül olduğunda
+  wizard "graceful degrade" davranışına düşüyor (uyarı logu + yer tutucu sonuç).
+- `ServerSetupUI.ps1` başlangıcına sunucu modülleri için `Import-Module` mantığı
+  eklendi (RdsInstaller.ps1, CertificateManager.ps1, FirewallConfig.ps1,
+  RDGatewayInstaller.ps1, RemoteAppPublisher.ps1, LicenseDetector.ps1,
+  GuacamoleInstaller.ps1, TailscaleInstaller.ps1, CloudflareTunnelInstaller.ps1,
+  AppScanner.ps1). Sunucu modüllerinin `Export-ModuleMember` tanımları olmadığı için
+  dot-source kullanılıyor; her modülün yüklenme durumu `$script:ServerModules` hashtable'ında
+  saklanıyor ve `Write-SetupLog` ile kayıt altına alınıyor. Mevcut `& $PSScriptRoot $a.Script`
+  çağrıları (LicenseDetector, AppScanner) hâlâ fallback olarak çalışıyor.
+- `Capture-Step3` artık `CheckedListBox.Items`'tan gelen orijinal PSCustomObject'leri
+  `SelectedAppObjects` hashtable'ında saklıyor; `Start-ClientInstall` bu objeleri kullanarak
+  `New-RdpFileForApps`, `New-WebShortcutBundle`, `Register-App` gibi fonksiyonları gerçek
+  `alias`/`name`/`path` verisiyle çağırıyor.
+
+### `apps.template.json` Çakışması — Çözüm
+
+`src/config/client/` altında iki şablon dosyası var; amaçları farklı olduğu için ayrı tutulur:
+
+| Dosya | Amaç | Aktif okuyan modül |
+| --- | --- | --- |
+| `apps.template.json` | Sunucudan RemoteApp tespiti başarısız olduğunda `ServerProbe.ps1`'in yüklediği **runtime fallback** şablonu (C1) | `ServerProbe.ps1` (`Get-ProbeFallbackApps`) |
+| `apps.template.example.json` | Geliştiriciler için referans örnek (C2); aktif olarak okunmaz | Yok (sadece dokümantasyon) |
+
+Her iki dosyanın `_comment`, `_role`, `_owner`, `_shares_namespace_with`, `_resolution`
+alanlarıyla bu karar kapsam içinde belgelenmiştir. İleride örnek dosyada
+geliştirme yapılırsa `apps.template.example.json` adı korunmalıdır; aktif şablonu
+değiştirmek ServerProbe davranışını bozar.
 
 ### Eklenenler (Added)
 
-#### Server-Side
-- **RDS Rolleri Kurulumu** (`RdsInstaller.ps1`)
-  - Session Host, Web Access, Gateway, Licensing, Connection Broker
-  - Alias tabanlı özellik adı çözümleme (`SessionHost` → `RDS-RD-Server`)
-  - Otomatik rollback (`Uninstall-WindowsFeature`)
-  - Management tools opsiyonu
-  - `AutoRestart` parametresi
-- **Sertifika Yönetimi** (`CertificateManager.ps1`)
-  - Self-signed sertifika üretimi (`New-SelfSignedCertificate`)
-  - CA-signed PFX import (`Import-PfxCertificate`)
-  - RDP-Tcp dinleyicisine sertifika bağlama (`wmic Win32_TSGeneralSetting`)
-- **RemoteApp Yayıncı** (`RemoteAppPublisher.ps1`)
-  - Koleksiyon oluşturma
-  - Uygulama yayını (`New-RDRemoteApp`)
-  - Yayınlanan uygulamaların listesi
-- **Firewall Konfigürasyonu** (`FirewallConfig.ps1`)
-  - 3389, 443, 8443, 5985/5986 port kuralları
-- **Lisans Tespiti** (`LicenseDetector.ps1`)
-  - 3 senaryo: lisans var, yok, grace period
-  - Registry tabanlı grace period okuma
-  - Otomatik öneri (RD Web vs Guacamole)
-- **Apache Guacamole Fallback** (`GuacamoleInstaller.ps1`)
-  - JDK 17 + Tomcat 9 + guacd + MySQL otomatik kurulum
-  - HTTPS port 8443
-  - Self-signed cert ile HTTPS
-- **Uygulama Tarayıcı** (`AppScanner.ps1`)
-  - `C:\Program Files`, `Program Files (x86)`, `ProgramData` altında .exe tarama
-  - Versiyon, ikon, kategori tespiti
-- **Server WinForms Sihirbazı** (`ServerSetupUI.ps1`)
-  - 7 adımlı kurulum
-  - Türkçe varsayılan, İngilizce fallback
-  - Aero modern tasarım
-- **5 Bağlantı Stratejisi**
-  - Direct RDP
-  - RD Gateway
-  - Apache Guacamole
-  - Tailscale mesh VPN
-  - Cloudflare Tunnel
-  - Hybrid (çoklu seçim)
+#### Server-Side Modüller (`src/powershell/server/`)
 
-#### Client-Side
-- **Sunucu Tespiti** (`ServerProbe.ps1`)
-  - WinRM ile bileşen analizi
-  - JSON formatlı sonuç
-  - HTML5 endpoint tipi tespiti (RD Web / Guacamole)
-- **WinForms Sihirbaz** (`SetupUI.ps1`)
-  - 4 adımlı kurulum
-  - Çoklu uygulama seçimi
-  - Native / Web / Both bağlantı tipi
-- **.rdp Üretici** (`RdpBuilder.ps1`)
-  - Şablon tabanlı üretim
-  - RD Gateway desteği
-  - Tailscale IP routing
-  - UTF-8 dosya çıktısı
-- **HTML5 Erişim** (`WebShortcuts.ps1`)
-  - RD Web URL kısayolu (`.url` dosyası)
-  - Guacamole URL kısayolu (port 8443)
-  - PWA manifest üretimi (Edge/Chrome install)
-- **Credential Manager** (`Credential.ps1`)
-  - Generic Credential türü
-  - Sunucu IP + uygulama kimliği tabanlı hedef anahtar
-- **App Registry** (`AppRegistry.ps1`)
-  - JSON tabanlı uygulama kayıt defteri
-  - Register / Unregister / Update operasyonları
+| Modül | Açıklama |
+| --- | --- |
+| `RdsInstaller.ps1` | RDS rolleri kurulumu (Session Host, Web Access, Gateway, Licensing, Connection Broker). Alias tabanlı özellik adı çözümleme, otomatik rollback, management tools desteği. |
+| `CertificateManager.ps1` | Self-signed sertifika üretimi (`New-SelfSignedCertificate`) veya CA-signed PFX import. RDP-Tcp dinleyicisine sertifika bağlama. |
+| `RemoteAppPublisher.ps1` | RemoteApp koleksiyonu oluşturma, uygulama yayını, koleksiyon listesi. |
+| `FirewallConfig.ps1` | TCP 3389 (RDP), 443 (RD Gateway), 8443 (Guacamole), 5985/5986 (WinRM) inbound kuralları. |
+| `LicenseDetector.ps1` | RD Web lisansı tespiti (3 senaryo: lisans var / yok / grace period). Otomatik öneri motoru. |
+| `GuacamoleInstaller.ps1` | Apache Guacamole fallback (JDK 17 + Tomcat 9 + guacd + MySQL). HTTPS port 8443, self-signed cert. |
+| `AppScanner.ps1` | Sunucudaki .exe tarayıcı. Versiyon, ikon, kategori, tahmini boyut tespiti. |
+| `ServerSetupUI.ps1` | 7 adımlı WinForms sihirbazı. Türkçe varsayılan, İngilizce fallback. Aero modern tasarım. |
 
-#### CI/CD
-- **GitHub Actions Build Pipeline** (`.github/workflows/build.yml`)
-  - `windows-latest` runner
-  - PowerShell 7.4 kurulumu
-  - PSScriptAnalyzer
-  - Pester testleri
-  - Inno Setup ile Client + Server derleme
-  - Artifact upload
-- **GitHub Actions Release** (`.github/workflows/release.yml`)
-  - Tag-based release (`v*`)
-  - Otomatik artifact yükleme
-  - SHA256SUMS üretimi
+#### Client-Side Modüller (`src/powershell/client/`)
+
+| Modül | Açıklama |
+| --- | --- |
+| `ServerProbe.ps1` | WinRM ile sunucu tespiti. JSON formatlı sonuç, HTML5 endpoint tipi tespiti (RD Web / Guacamole). |
+| `SetupUI.ps1` | 4 adımlı WinForms sihirbazı. Çoklu uygulama seçimi, Native / Web / Both bağlantı tipi. |
+| `RdpBuilder.ps1` | `.rdp` dosyası şablon motoru. RD Gateway desteği, Tailscale IP routing, UTF-8 çıktı. |
+| `WebShortcuts.ps1` | RD Web / Guacamole URL kısayolları (`.url`). PWA manifest üretimi. |
+| `Credential.ps1` | Windows Credential Manager wrapper. Sunucu IP + uygulama kimliği tabanlı hedef anahtar. |
+| `AppRegistry.ps1` | JSON tabanlı uygulama kayıt defteri. Register / Unregister / Update operasyonları. |
+| `SelfTest.ps1` | Bağlantı test komutları. |
+
+#### Bağlantı Stratejileri
+
+Kurulum sırasında çoklu seçim destekli 5 strateji + 1 hybrid seçenek:
+
+| Strateji | Port / Protokol | Gereksinim | Kullanım Senaryosu |
+| --- | --- | --- | --- |
+| **Direct RDP** | TCP 3389 | — | LAN, küçük ofis, NDA'lı ortam |
+| **RD Gateway** | TCP 443 (HTTPS) | RD Web lisansı gerekebilir | Kurumsal, dışarıdan erişim, firewall dostu |
+| **Apache Guacamole** | TCP 8443 (HTTPS) | JDK 17 + Tomcat 9 + MySQL | HTML5 erişim, RD Web lisansı yoksa fallback |
+| **Tailscale** | UDP 41641 (mesh) | Cloud relay (ücretsiz tier) | Sıfır konfigürasyon, NAT arkası cihazlar |
+| **Cloudflare Tunnel** | Outbound 443 | Cloudflare hesabı | Dışarıya port açmadan yayınlama |
+| **Hybrid** | Çoklu port | Yukarıdakilerin kombinasyonu | Farklı kullanıcı tipleri için farklı erişim |
+
+#### Installer (`src/inno/`)
+
+- `RdpVirtualBoxApp-Client.iss` — Client Inno Setup wizard. PS1 modüllerini `%TEMP%\RdpVirtualBoxApp\` altına extract eder. ~5-8 MB çıktı.
+- `RdpVirtualBoxApp-Server.iss` — Server Inno Setup. `PrivilegesRequired=admin`. `%ProgramFiles%\RdpVirtualBoxApp\` altına kurar. ~8-12 MB çıktı.
+
+#### CI/CD (`.github/workflows/`)
+
+- `build.yml` — `windows-latest` runner. PowerShell 7.4 + PSScriptAnalyzer + Pester + Inno Setup derleme. PR ve push'ta çalışır, artifact üretir.
+- `release.yml` — Tag-based (`v*`) otomatik release. Client + Server artifact + SHA256SUMS yükler.
+- `docs.yml` — GitHub Pages deploy. `docs/` değişikliklerinde ve manuel dispatch ile landing site yayınlar.
 
 #### Dokümantasyon
+
 - `README.md` — Proje özeti (Türkçe + İngilizce)
-- `docs/server-requirements.md`
-- `docs/client-requirements.md`
-- `docs/server-setup-guide.md`
-- `docs/client-setup-guide.md`
-- `docs/licensing-and-rdweb.md`
-- `docs/troubleshooting.md`
+- `docs/server-requirements.md` — Donanım, yazılım, lisans gereksinimleri
+- `docs/client-requirements.md` — Windows 10/11 istemci gereksinimleri
+- `docs/server-setup-guide.md` — IT admin için 7 adımlı kılavuz
+- `docs/client-setup-guide.md` — Son kullanıcı için 4 adımlı kılavuz
+- `docs/licensing-and-rdweb.md` — RD Web Access vs Guacamole karşılaştırması
+- `docs/troubleshooting.md` — Yaygın hatalar ve çözümler
+- `docs/index.html` — GitHub Pages landing
+- `docs/release-notes-v1.0.0.md` — v1.0.0 release notes taslağı
 
 #### Testler
-- **Pester 5** birim testleri
-  - `tests/client/test-server-probe.ps1`
-  - `tests/client/test-rdp-builder.ps1`
-  - `tests/client/test-app-registry.ps1`
-  - `tests/client/test-web-shortcuts.ps1`
-  - `tests/server/test-rds-installer.ps1`
-  - `tests/server/test-license-detector.ps1`
-  - `tests/server/test-guacamole-installer.ps1`
+
+Pester 5 uyumlu birim testleri — `tests/` altında 7 dosya (~79 test case):
+
+- `tests/client/test-server-probe.ps1`
+- `tests/client/test-rdp-builder.ps1`
+- `tests/client/test-app-registry.ps1`
+- `tests/client/test-web-shortcuts.ps1`
+- `tests/server/test-rds-installer.ps1`
+- `tests/server/test-license-detector.ps1`
+- `tests/server/test-guacamole-installer.ps1`
+
+> Not: Toplam test case sayısı plan referansında **79** olarak belirtilmiştir. Bu sayı CI çıktısıyla doğrulanmalıdır; dosya başına test sayısı zamanla değişebilir.
+
+### Değişenler (Changed)
+Yok — ilk sürüm.
+
+### Düzeltmeler (Fixed)
+Yok — ilk sürüm.
+
+### Kaldırılanlar (Removed)
+Yok — ilk sürüm.
+
+### Güvenlik (Security)
+
+- Self-signed sertifika varsayılan: ilk bağlantıda tarayıcı/RDP istemcisi uyarı verir.
+- Hassas veri: parolalar Credential Manager'a generic credential türünde yazılır, `.rdp` dosyasında düz metin bulunmaz.
+- CA-signed PFX import desteklenir (üretim için önerilir).
 
 ### Bilinen Sınırlamalar (Known Limitations)
 
-- macOS / Linux istemciler resmi olarak desteklenmiyor (web modu hariç).
-- Test ortamı olmadığından gerçek sunucu entegrasyon testleri kullanıcıya ertelenmiş.
-- Guacamole performansı native RDP'den düşük olabilir (özellikle CAD / yüksek yenileme gerektiren uygulamalarda).
-- Cloudflare Tunnel ücretsiz tier bağlantı sınırı uygular.
-- Tailscale ücretsiz tier 100 cihaz sınırı.
+- **Platform** — macOS / Linux istemciler resmi olarak desteklenmiyor (yalnızca web modu, native RDP yok).
+- **Test ortamı** — Otomatik test runner'da gerçek Windows Server yok; entegrasyon testleri kullanıcıya ertelenmiş.
+- **Guacamole performansı** — Native RDP'den düşük olabilir (CAD, yüksek yenileme hızı gerektiren uygulamalarda).
+- **Cloudflare Tunnel** — Ücretsiz tier bağlantı sınırı uygular.
+- **Tailscale** — Ücretsiz tier 100 cihaz sınırı; DERP relay latency'si eklenir.
+- **Hybrid yapılandırmalar** — Birden çok strateji birden seçilirse bakım/dokümantasyon karmaşıklığı artar.
+- **Sunucu yeniden başlatma** — RDS rol kurulumu sonrası otomatik restart opsiyonel (`AutoRestart`).
+
+### Upgrade / Migration
+N/A — ilk sürüm. Önceki sürüm yok.
 
 ### Planlanan (Roadmap)
 

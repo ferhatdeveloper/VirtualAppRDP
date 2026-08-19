@@ -1,6 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/apps-template",
   "_comment": "ServerProbe.ps1 tarafından RemoteApp tespiti başarısız olduğunda yüklenen FALLBACK şablonudur. Gerçek kurulumda sunucudan gelen Get-RDRemoteApp sonucu kullanılır.",
+  "_role": "runtime-fallback",
+  "_owner": "Ajan C1 (ServerProbe.ps1)",
+  "_shares_namespace_with": "apps.template.example.json",
+  "_resolution": "Ayri tutulur. apps.template.json = ServerProbe.ps1 fallback sablonu (C1 tarafindan okunur). apps.template.example.json = gelistiriciler icin referans ornek (C2 tarafindan aktif olarak okunmaz; sadece ornek amacli).",
   "_agent": "C1",
   "_updated": "2026-08-19",
   "templateVersion": "1.0.0",

@@ -39,6 +39,42 @@ try {
     Write-Warning "Log dizini olusturulamadi: $_"
 }
 
+# -----------------------------------------------------------------------------
+# 0.1 Sunucu tarafi modul yukleme (RdsInstaller, CertificateManager, vs.)
+# Server-side modullerin Export-ModuleMember tanimlari yok; bu yuzden
+# dot-source ile ayni PowerShell oturumuna enjekte ediyoruz. Bir modul
+# bulunamazsa wizard yine acilir ama ilgili adim "modul yok" uyarisi verir.
+# -----------------------------------------------------------------------------
+$script:ServerModules = [ordered]@{}
+$script:ServerModuleNames = @(
+    'RdsInstaller.ps1',
+    'CertificateManager.ps1',
+    'FirewallConfig.ps1',
+    'RDGatewayInstaller.ps1',
+    'RemoteAppPublisher.ps1',
+    'LicenseDetector.ps1',
+    'GuacamoleInstaller.ps1',
+    'TailscaleInstaller.ps1',
+    'CloudflareTunnelInstaller.ps1',
+    'AppScanner.ps1'
+)
+foreach ($moduleName in $script:ServerModuleNames) {
+    $modulePath = Join-Path $PSScriptRoot $moduleName
+    if (-not (Test-Path -LiteralPath $modulePath)) {
+        Write-SetupLog "Sunucu modulu bulunamadi (atlandi): $modulePath" -Level WARN
+        $script:ServerModules[$moduleName] = $false
+        continue
+    }
+    try {
+        . $modulePath
+        $script:ServerModules[$moduleName] = $true
+        Write-SetupLog "Sunucu modulu yuklendi: $moduleName" -Level INFO
+    } catch {
+        $script:ServerModules[$moduleName] = $false
+        Write-SetupLog "Sunucu modulu yuklenemedi: $moduleName -> $_" -Level ERROR
+    }
+}
+
 function Write-SetupLog {
     [CmdletBinding()]
     param(
