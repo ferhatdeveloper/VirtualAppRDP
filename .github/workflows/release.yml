@@ -1,0 +1,136 @@
+# ===============================================
+# Rdp Virtual Box App — Release Workflow
+# ===============================================
+# Tetikleyici:
+#   - "v*" pattern'ine uyan tag push'ları (örn. v1.0.0)
+# Davranış:
+#   1. Build job'unu çalıştırır (artifacts hazır)
+#   2. Build artifacts'ı indirir
+#   3. GitHub Releases üzerinde DRAFT bir release oluşturur
+#   4. Client + Server .exe + SHA256SUMS dosyalarını yükler
+#   5. Otomatik release notes üretir
+# ===============================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Release oluşturmak için contents:write gerekli
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # Build workflow'unu çağırıyoruz (reusable workflow olmadan
+    # tekrar tanımlamak yerine bu workflow içindeki adımları
+    # kullanmak için kendi build adımlarımızı da çalıştırıyoruz).
+    # Daha temiz yaklaşım: aşağıdaki adımları çalıştır, sonra
+    # release job'unda artifact indir.
+    name: Build Artifacts
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell 7.4
+        uses: actions/setup-powershell@v4
+        with:
+          pwsh-version: '7.4'
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Client Setup
+        shell: pwsh
+        run: |
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $isccPath "src\inno\RdpVirtualBoxApp-Client.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Client build failed ($LASTEXITCODE)" }
+
+      - name: Build Server Setup
+        shell: pwsh
+        run: |
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $isccPath "src\inno\RdpVirtualBoxApp-Server.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Server build failed ($LASTEXITCODE)" }
+
+      - name: Stage and hash artifacts
+        shell: pwsh
+        run: |
+          New-Item -Path 'build/output' -ItemType Directory -Force | Out-Null
+          Get-ChildItem -Path 'src/inno/Output' -Filter '*.exe' -ErrorAction SilentlyContinue |
+            ForEach-Object { Move-Item $_.FullName 'build/output' -Force }
+          Get-ChildItem 'build/output\*.exe' | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Out-File 'build/output/SHA256SUMS.txt' -Append -Encoding UTF8
+          }
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-virtual-box-app
+          path: |
+            build/output/RdpVirtualBoxApp-Client-*.exe
+            build/output/RdpVirtualBoxApp-Server-*.exe
+            build/output/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 90
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: rdp-virtual-box-app
+          path: dist
+
+      - name: List downloaded files
+        shell: pwsh
+        run: Get-ChildItem -Recurse dist | Select-Object FullName, Length
+
+      - name: Create Release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            ## Rdp Virtual Box App v${{ github.ref_name }}
+
+            Bu sürümde iki ayrı setup bulunur:
+
+            - `RdpVirtualBoxApp-Client-v${{ github.ref_name }}.exe` — Kullanıcı tarafı kurulum (Windows 10/11)
+            - `RdpVirtualBoxApp-Server-v${{ github.ref_name }}.exe` — Sunucu tarafı kurulum (Windows Server 2016+, yönetici olarak çalıştırılmalı)
+
+            ### Kurulum
+
+            1. **Önce** sunucu tarafında `RdpVirtualBoxApp-Server-*.exe` çalıştırılır (admin).
+            2. **Sonra** her kullanıcı makinesinde `RdpVirtualBoxApp-Client-*.exe` çalıştırılır.
+            3. SHA256 doğrulaması için `SHA256SUMS.txt` kullanılır.
+
+            ### Doğrulama
+
+            ```powershell
+            Get-FileHash .\RdpVirtualBoxApp-Client-v${{ github.ref_name }}.exe -Algorithm SHA256
+            Get-FileHash .\RdpVirtualBoxApp-Server-v${{ github.ref_name }}.exe -Algorithm SHA256
+            ```
+
+            Tüm hash'ler `SHA256SUMS.txt` içinde yer alır.
+
+            > Not: Bu bir **DRAFT** release'dir. Yayına almadan önce inceleyiniz.

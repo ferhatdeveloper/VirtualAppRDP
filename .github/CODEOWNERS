@@ -1,0 +1,11 @@
+# CODEOWNERS — her PR bu kişinin onayını ister
+# Varsayılan: tüm repo @ferhatdeveloper'a ait
+
+* @ferhatdeveloper
+
+# Daha ayrıntılı sahiplenme örneği (ileride açabilirsiniz):
+# /src/powershell/server/  @ferhatdeveloper
+# /src/powershell/client/  @ferhatdeveloper
+# /src/inno/               @ferhatdeveloper
+# /docs/                   @ferhatdeveloper
+# /.github/workflows/      @ferhatdeveloper

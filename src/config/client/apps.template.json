@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json.schemastore.org/apps-template",
+  "_comment": "ServerProbe.ps1 tarafından RemoteApp tespiti başarısız olduğunda yüklenen FALLBACK şablonudur. Gerçek kurulumda sunucudan gelen Get-RDRemoteApp sonucu kullanılır.",
+  "_agent": "C1",
+  "_updated": "2026-08-19",
+  "templateVersion": "1.0.0",
+  "serverProbe": {
+    "defaultPorts": {
+      "winrm": 5985,
+      "winrmSecure": 5986,
+      "rdp": 3389,
+      "https": 443,
+      "guacamole": 8443,
+      "rdweb": 443,
+      "tailscale": 41641
+    },
+    "timeouts": {
+      "winrmProbe": 30,
+      "portTest": 5,
+      "wmiFallback": 30,
+      "remoteInvoke": 60
+    },
+    "components": {
+      "WinRM":            { "weight": 10, "required": true  },
+      "OS":               { "weight":  5, "required": true  },
+      "Domain":           { "weight":  3, "required": false },
+      "RDS_Role":         { "weight": 10, "required": true  },
+      "RD_SessionHost":   { "weight": 10, "required": true  },
+      "RD_WebAccess":     { "weight":  6, "required": false },
+      "RD_Gateway":       { "weight":  6, "required": false },
+      "RemoteApps":       { "weight":  8, "required": true  },
+      "RDP_Port":         { "weight":  9, "required": true  },
+      "HTTPS_Port":       { "weight":  6, "required": false },
+      "Guacamole_Port":   { "weight":  6, "required": false },
+      "Certificate":      { "weight":  5, "required": true  },
+      "License":          { "weight":  8, "required": true  }
+    }
+  },
+  "recommendationRules": [
+    {
+      "id": "no-html5",
+      "when": {
+        "or": [
+          { "field": "webEndpoint.rdWebAvailable",      "equals": false },
+          { "field": "webEndpoint.guacamoleAvailable",  "equals": false }
+        ]
+      },
+      "advice": "HTML5 endpoint tespit edilmedi. RD Web Access kurun veya Apache Guacamole fallback kullanın."
+    },
+    {
+      "id": "guacamole-only",
+      "when": {
+        "and": [
+          { "field": "webEndpoint.guacamoleAvailable", "equals": true  },
+          { "field": "webEndpoint.rdWebAvailable",     "equals": false }
+        ]
+      },
+      "advice": "HTML5 erişimi için Guacamole kullanılacak (RD Web lisansı yok)."
+    },
+    {
+      "id": "missing-rdsh",
+      "when": {
+        "field": "components.RD_SessionHost.status",
+        "in": ["error", "unknown"]
+      },
+      "advice": "RD Session Host rolü kurulu değil. RemoteApp yayınlamak için zorunludur."
+    },
+    {
+      "id": "self-signed-cert",
+      "when": {
+        "field": "components.Certificate.value",
+        "equals": "Self-signed"
+      },
+      "advice": "RDP sertifikası self-signed. Tarayıcı uyarısını kaldırmak için CA-imzalı sertifika kullanın."
+    },
+    {
+      "id": "license-grace",
+      "when": {
+        "field": "components.License.status",
+        "equals": "warning"
+      },
+      "advice": "Lisans durumu grace period veya yapılandırma eksik olabilir. Server tarafını kontrol edin."
+    },
+    {
+      "id": "no-apps",
+      "when": {
+        "and": [
+          { "field": "components.RDS_Role.status",      "equals": "ok" },
+          { "field": "existingRemoteApps.length",       "equals": 0    }
+        ]
+      },
+      "advice": "RDS kurulu ancak RemoteApp yayınlanmamış. Server-side kurulum ile uygulama ekleyin."
+    },
+    {
+      "id": "rdp-port-blocked",
+      "when": {
+        "field": "components.RDP_Port.status",
+        "in": ["error", "warning"]
+      },
+      "advice": "RDP portu (3389) erişilemez. Firewall / NAT kontrolü yapın veya RD Gateway / Guacamole üzerinden geçin."
+    }
+  ],
+  "connectionStrategies": [
+    {
+      "id": "direct",
+      "label": "Direct RDP",
+      "port": 3389,
+      "protocol": "TCP",
+      "requires": { "component": "RDP_Port", "status": "ok" },
+      "clientArtifact": ".rdp",
+      "use_when": "LAN içi veya firewall arkadaşı port yönlendirmesi yapılmışsa"
+    },
+    {
+      "id": "gateway",
+      "label": "RD Gateway",
+      "port": 443,
+      "protocol": "TCP/HTTPS",
+      "requires": { "component": "RD_Gateway", "status": "ok" },
+      "clientArtifact": ".rdp (gatewayhostname)",
+      "use_when": "Dışarıdan RDP, firewall dostu HTTPS üzerinden tünelleme"
+    },
+    {
+      "id": "guacamole",
+      "label": "Apache Guacamole",
+      "port": 8443,
+      "protocol": "TCP/HTTPS",
+      "requires": { "component": "Guacamole_Port", "status": "ok" },
+      "clientArtifact": "Web URL (browser tab)",
+      "use_when": "RD Web lisansı yoksa veya HTML5 erişim isteniyorsa"
+    },
+    {
+      "id": "tailscale",
+      "label": "Tailscale Mesh VPN",
+      "port": 41641,
+      "protocol": "UDP",
+      "requires": { "external": "tailscale-agent-running" },
+      "clientArtifact": ".rdp (Tailscale IP)",
+      "use_when": "Sunucu ve istemci Tailscale ağındaysa, port açmaya gerek yok"
+    },
+    {
+      "id": "cloudflare",
+      "label": "Cloudflare Tunnel",
+      "port": 443,
+      "protocol": "TCP (outbound)",
+      "requires": { "external": "cloudflared-service" },
+      "clientArtifact": ".rdp (tunnel hostname)",
+      "use_when": "Dışarıya port açmadan yayınlama, global DDoS koruması"
+    }
+  ],
+  "apps": [
+    {
+      "id": "fallback_custom",
+      "name": "Özel Yoldan Uygulama Ekle",
+      "executable": "",
+      "remoteAppName": "",
+      "icon": "generic.ico",
+      "category": "custom",
+      "default": false,
+      "_note": "Bu kayıt yalnızca fallback amaçlıdır. Get-RDRemoteApp başarılı olduğunda sunucudan gelen liste kullanılır."
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+# Rdp Virtual Box App - .rdp parametre sablonu
+# Satir basina bir parametre, %PLACEHOLDER% ile doldurulur.
+# Tipler: s = string, i = integer, b = boolean
+# Bos birakilan satirlar uretim sirasinda filtrelenir.
+
+full address:s:%SERVER%
+username:s:%USERNAME%
+domain:s:
+remoteapplicationmode:i:1
+remoteapplicationname:s:%APPNAME%
+remoteapplicationprogram:s:%APPALIAS%
+alternate full address:s:%ALTERNATE_ADDRESS%
+gatewayhostname:s:%GATEWAY_HOST%
+gatewaydomain:s:%GATEWAY_DOMAIN%
+gatewayusagemethod:i:%GATEWAY_METHOD%
+gatewaycredentialssource:i:%GATEWAY_CRED_SOURCE%
+drivestoredirect:s:%DRIVE_REDIRECT%
+redirectclipboard:i:%CLIPBOARD_REDIRECT%
+redirectprinters:i:%PRINTER_REDIRECT%
+redirectsmartcards:i:%SMARTCARD_REDIRECT%
+audiomode:i:%AUDIO_MODE%
+screen mode id:i:%FULLSCREEN%
+use multimon:i:%MULTIMON%
+authentication level:i:%AUTH_LEVEL%
+enablecredsspsupport:i:%CREDSSP%
+videoplaybackmode:i:1
+networkautodetect:i:1
+bandwidthautodetect:i:1
+connection type:i:6
+displayconnectionbar:i:1
+codec:string:
+keyboardhook:i:2
+redirectposdevices:i:0
+redirectdirectx:i:1
+devicestoredirect:s:
+disableremoteappcapscheck:i:0
+prompt for credentials:i:1
+span monitors:i:1
+desktopwidth:i:%WIDTH%
+desktopheight:i:%HEIGHT%

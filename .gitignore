@@ -1,0 +1,80 @@
+# ===============================================
+# Rdp Virtual Box App — .gitignore
+# ===============================================
+
+# --- Build çıktıları ---
+build/
+dist/
+output/
+*.exe
+*.msi
+*.zip
+*.7z
+*.tar.gz
+SHA256SUMS.txt
+
+# --- PowerShell geçici / artefaktları ---
+*.ps1xml
+*.psm1.bak
+*.psd1.bak
+
+# --- Inno Setup çıktıları ---
+src/inno/Output/
+src/inno/*.txt
+
+# --- Log / Temp ---
+*.log
+*.tmp
+*.temp
+logs/
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- OS ---
+.Trashes
+$RECYCLE.BIN/
+
+# --- Secrets / Credentials (asla repo'ya gitmemeli) ---
+*.pfx
+*.p12
+*.key
+*.pem
+secrets.json
+appsettings.*.json
+.env
+.env.*
+
+# --- Node / Test (Pester outputs vs.) ---
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# --- Pester ---
+tests/results/
+*.Tests.ps1.xml
+
+# --- PowerShell modül cache ---
+~/.local/
+Modules/
+Packages/
+OneDrive/
+Documenti/
+Documentos/
+Imágenes/
+Immagini/
+Imagens/
+
+# --- NuGet / Chocolatey ---
+packages/
+*.nupkg
+
+# --- Generated artifacts ---
+*.user
+*.suo

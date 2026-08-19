@@ -1,0 +1,153 @@
+# ===============================================
+# Rdp Virtual Box App — Build Workflow
+# ===============================================
+# Tetikleyiciler:
+#   - main / develop branch'e push
+#   - main'e pull request
+#   - workflow_dispatch (manuel)
+# Derleme adımları:
+#   1. Checkout + PowerShell 7.4 kurulumu
+#   2. PSScriptAnalyzer (lint) ve Pester (test)
+#   3. Inno Setup kurulumu ve ISCC ile Client + Server setup derleme
+#   4. SHA256SUMS üretimi ve artifact yükleme
+# ===============================================
+
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Gereksiz izinler verilmez, sadece default token yeterli
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Setup Executables
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      # ---------- 1. Checkout ----------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------- 2. PowerShell 7.4 kurulumu ----------
+      - name: Setup PowerShell 7.4
+        uses: actions/setup-powershell@v4
+        with:
+          pwsh-version: '7.4'
+
+      # ---------- 3. PSScriptAnalyzer kurulumu ----------
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module PSScriptAnalyzer
+          Write-Host "PSScriptAnalyzer: $((Get-Module PSScriptAnalyzer).Version)"
+
+      # ---------- 4. Pester kurulumu ----------
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Install-Module Pester -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester
+          Write-Host "Pester: $((Get-Module Pester).Version)"
+
+      # ---------- 5. Lint (PSScriptAnalyzer) ----------
+      - name: Run PSScriptAnalyzer (lint)
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path ./src -Recurse
+          $results | Tee-Object -FilePath analyzer.txt
+          if ($results | Where-Object { $_.Severity -in 'Error', 'Warning' }) {
+            Write-Host "Lint uyarıları/hataları yukarıda listelendi (non-fatal)."
+          } else {
+            Write-Host "Lint temiz."
+          }
+
+      # ---------- 6. Pester testleri ----------
+      - name: Run Pester Tests
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests'
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
+      # ---------- 7. Inno Setup kurulumu (Chocolatey) ----------
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      # ---------- 8. Build Client Setup ----------
+      - name: Build Client Setup
+        shell: pwsh
+        run: |
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $isccPath)) {
+            throw "ISCC.exe bulunamadı: $isccPath"
+          }
+          # Inno Setup default çıktı yeri "src/inno/Output" -> "build/output" kopyalanır
+          & $isccPath "src\inno\RdpVirtualBoxApp-Client.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Client setup build başarısız (exit=$LASTEXITCODE)."
+          }
+
+      # ---------- 9. Build Server Setup ----------
+      - name: Build Server Setup
+        shell: pwsh
+        run: |
+          $isccPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $isccPath)) {
+            throw "ISCC.exe bulunamadı: $isccPath"
+          }
+          & $isccPath "src\inno\RdpVirtualBoxApp-Server.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Server setup build başarısız (exit=$LASTEXITCODE)."
+          }
+
+      # ---------- 10. Build çıktılarını standart konuma taşı ----------
+      - name: Stage build artifacts
+        shell: pwsh
+        run: |
+          New-Item -Path 'build/output' -ItemType Directory -Force | Out-Null
+          Get-ChildItem -Path 'src/inno/Output' -Filter '*.exe' -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              Move-Item -Path $_.FullName -Destination 'build/output' -Force
+            }
+          $count = (Get-ChildItem -Path 'build/output' -Filter '*.exe').Count
+          Write-Host "Stage edilen setup sayısı: $count"
+          if ($count -lt 2) {
+            Write-Warning "Beklenen 2 setup dosyası yerine $count adet üretildi."
+          }
+
+      # ---------- 11. SHA256SUMS üretimi ----------
+      - name: Generate SHA256SUMS
+        shell: pwsh
+        run: |
+          $lines = Get-ChildItem 'build/output\*.exe' |
+            ForEach-Object {
+              $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
+              "$hash  $($_.Name)"
+            }
+          $lines | Set-Content -Path 'build/output/SHA256SUMS.txt' -Encoding UTF8
+          Get-Content 'build/output/SHA256SUMS.txt'
+
+      # ---------- 12. Artifact upload ----------
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-virtual-box-app
+          path: |
+            build/output/RdpVirtualBoxApp-Client-*.exe
+            build/output/RdpVirtualBoxApp-Server-*.exe
+            build/output/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
