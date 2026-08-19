@@ -119,7 +119,7 @@ Filename: "{app}\powershell\{#MyAppExeName}"; Description: "{cm:LaunchSetup}"; F
 [UninstallDelete]
 ; Per-user data and logs
 Type: filesandordirs; Name: "{userappdata}\{#MyAppShortName}"
-Type: filesandordirs; Name: "{userlocalappdata}\{#MyAppShortName}"
+Type: filesandordirs; Name: "{localappdata}\{#MyAppShortName}"
 Type: filesandordirs; Name: "{userdocs}\{#MyAppShortName}"
 
 ; Registry entries the wizard may create
