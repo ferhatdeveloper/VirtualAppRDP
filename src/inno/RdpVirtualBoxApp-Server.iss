@@ -44,9 +44,9 @@ SolidCompression=yes
 LZMAUseSeparateProcess=yes
 LZMANumBlockThreads=8
 ; Visual assets (placeholders - swap when real art is available)
-SetupIconFile=assets\icon.ico
-WizardSmallImageFile=assets\server\server-wizard.bmp
-WizardImageFile=assets\server\server-banner.bmp
+SetupIconFile=..\assets\icon.ico
+WizardSmallImageFile=..\assets\server\server-wizard.bmp
+WizardImageFile=..\assets\server\server-banner.bmp
 ; Uninstaller
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
@@ -58,7 +58,7 @@ AppMutex=RdpVirtualBoxApp-Server-Setup-Mutex
 MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-LicenseFile=LICENSE
+LicenseFile=..\LICENSE
 
 [Languages]
 Name: "turkish"; MessagesFile: "compiler:Languages\Turkish.isl"
@@ -70,17 +70,17 @@ Name: "startmenu";  Description: "{cm:CreateStartMenu}";  GroupDescription: "{cm
 
 [Files]
 ; PowerShell modules (Server-side)
-Source: "powershell\server\*.ps1";                   DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\powershell\server\*.ps1";                   DestDir: "{app}\PowerShell"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Config templates
-Source: "config\server\*";                           DestDir: "{app}\Config";    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\config\server\*";                           DestDir: "{app}\Config";    Flags: ignoreversion recursesubdirs createallsubdirs
 ; Server assets (banners, icons)
-Source: "assets\server\*";                           DestDir: "{app}\Assets";    Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "assets\icon.ico";                           DestDir: "{app}\Assets";    Flags: ignoreversion
+Source: "..\assets\server\*";                           DestDir: "{app}\Assets";    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\assets\icon.ico";                           DestDir: "{app}\Assets";    Flags: ignoreversion
 ; Inno assets (so the wizard image sources are present at runtime too)
-Source: "assets\server\server-wizard.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
-Source: "assets\server\server-banner.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
+Source: "..\assets\server\server-wizard.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
+Source: "..\assets\server\server-banner.bmp";           DestDir: "{app}\Assets";    Flags: ignoreversion
 ; Optional helper scripts (Launch helper + README placeholder)
-Source: "powershell\server\ServerSetupUI.ps1";       DestDir: "{app}";           Flags: ignoreversion
+Source: "..\powershell\server\ServerSetupUI.ps1";       DestDir: "{app}";           Flags: ignoreversion
 
 [Dirs]
 Name: "{commonappdata}\RdpVirtualBoxApp";        Permissions: users-modify

@@ -155,15 +155,11 @@ jobs:
           chmod 777 build build/output output 2>/dev/null || true
           # Source dosyalarinin okunabilir oldugundan emin ol (Docker uid 1000 icin)
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          # Client.iss'i repo root'a kopyala ki relative path'ler (powershell\client\* vs)
-          # /work altinda direkt gorulebilsin
-          cp src/inno/RdpVirtualBoxApp-Client.iss build/RdpVirtualBoxApp-Client.iss
-          chmod 777 build/RdpVirtualBoxApp-Client.iss
           # Önce orijinal Client.iss'i dene (root olarak ki tum dosyalari okuyabilsin)
           if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
-               build/RdpVirtualBoxApp-Client.iss \
+               src/inno/RdpVirtualBoxApp-Client.iss \
                > iscc_client_orig.log 2>&1; then
             echo "Original Client.iss derlendi."
             echo "Original Client.iss derlendi."
@@ -208,13 +204,10 @@ jobs:
           mkdir -p output
           chmod 777 build build/output output 2>/dev/null || true
           chmod -R a+rX src LICENSE src/powershell src/config src/assets 2>/dev/null || true
-          # Server.iss'i repo root'a kopyala ki relative path'ler direkt gorulebilsin
-          cp src/inno/RdpVirtualBoxApp-Server.iss build/RdpVirtualBoxApp-Server.iss
-          chmod 777 build/RdpVirtualBoxApp-Server.iss
           if docker run --rm -i \
                -v "$(pwd):/work" \
                amake/innosetup:innosetup6-bookworm \
-               build/RdpVirtualBoxApp-Server.iss \
+               src/inno/RdpVirtualBoxApp-Server.iss \
                > iscc_server_orig.log 2>&1; then
             echo "Original Server.iss derlendi."
             if [ -d "output" ]; then
@@ -278,7 +271,9 @@ jobs:
           name: iscc-logs
           path: |
             iscc_client.log
+            iscc_client_orig.log
             iscc_server.log
+            iscc_server_orig.log
             analyzer.txt
             build/**/*.iss
           if-no-files-found: ignore
