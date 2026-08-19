@@ -24,10 +24,13 @@ on:
       - main
   workflow_dispatch:
 
-# Aynı branch/ref için art arda gelen run'ları iptal et (queue tıkanmasını önler)
+# Art arda gelen run'ları SIRAYA koy ama iptal etme (her run'un tamamlanmasını
+# görmek için). Daha önce cancel-in-progress: true idi, bu yüzden yeni push
+# gelince önceki run cancel ediliyor ve 'Failure' görünüyordu — gerçek bir
+# hata olsa bile bunu göremiyorduk.
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # Gereksiz izinler verilmez, sadece default token yeterli
 permissions:
