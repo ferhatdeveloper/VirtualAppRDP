@@ -44,7 +44,7 @@ Source: "src/assets/*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesub
 
 [Dirs]
 Name: "{userappdata}\RdpVirtualBoxApp"; Permissions: users-modify
-Name: "{userlocalappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
+Name: "{localappdata}\RdpVirtualBoxApp\Logs"; Permissions: users-modify
 Name: "{userdocs}\RdpVirtualBoxApp"; Permissions: users-modify
 
 [Icons]
