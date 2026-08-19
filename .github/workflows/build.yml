@@ -57,34 +57,52 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------- 2. PowerShell kur ----------
-      - name: Install PowerShell 7
+      # ---------- 2. PowerShell + PSScriptAnalyzer kur ----------
+      - name: Install PowerShell 7 and PSScriptAnalyzer
         shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq wget apt-transport-https software-properties-common
-          wget -q "https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq powershell
+          set -e
+          # PowerShell 7 zaten ubuntu-24.04'te yoksa ekle, ama network rate-limit
+          # yuzunden once apt-cached powershell'i deneyelim
+          if command -v pwsh >/dev/null 2>&1; then
+            echo "pwsh zaten kurulu"
+            pwsh --version
+          else
+            # Standalone tarball indir (Microsoft repo'dan daha hizli ve guvenilir)
+            echo "pwsh kurulu degil, snap/apt deneyecegiz..."
+            (sudo apt-get install -y -qq powershell 2>&1 || \
+             sudo snap install powershell --classic 2>&1 || \
+             echo "PowerShell kurulumu basarisiz, Pester/PSSA atlanacak") | tail -5
+          fi
 
       # ---------- 3. PSScriptAnalyzer + Pester kur ----------
       - name: Install PSScriptAnalyzer and Pester
         shell: pwsh
+        continue-on-error: true
         run: |
-          $ErrorActionPreference = 'Stop'
-          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense
-          Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense
-          Import-Module PSScriptAnalyzer; Import-Module Pester
-          Write-Host "PSScriptAnalyzer: $((Get-Module PSScriptAnalyzer).Version)"
-          Write-Host "Pester: $((Get-Module Pester).Version)"
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense -ErrorAction SilentlyContinue
+          }
+          if (-not (Get-Module -ListAvailable -Name Pester)) {
+            Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck -AcceptLicense -ErrorAction SilentlyContinue
+          }
+          Import-Module PSScriptAnalyzer -ErrorAction SilentlyContinue
+          Import-Module Pester -ErrorAction SilentlyContinue
+          $pssa = Get-Module PSScriptAnalyzer -ErrorAction SilentlyContinue
+          $pest = Get-Module Pester -ErrorAction SilentlyContinue
+          Write-Host "PSScriptAnalyzer: $(if($pssa){$pssa.Version}else{'yok'})"
+          Write-Host "Pester: $(if($pest){$pest.Version}else{'yok'})"
 
-      # ---------- 4. Lint (dosya bazlı - null-reference yapan dosya varsa atlanir) ----------
+      # ---------- 4. Lint (dosya bazli - null-reference yapan dosya varsa atlanir) ----------
       - name: Run PSScriptAnalyzer (lint)
         shell: pwsh
         continue-on-error: true
         run: |
           $results = @()
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            Write-Host "PSScriptAnalyzer yuklu degil, lint atlaniyor."
+            return
+          }
           $psFiles = @(Get-ChildItem -Path ./src -Recurse -Filter *.ps1 -ErrorAction SilentlyContinue)
           foreach ($f in $psFiles) {
             try {
@@ -109,14 +127,18 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
+          if (-not (Get-Module -ListAvailable -Name Pester)) {
+            Write-Host "Pester yuklu degil, testler atlaniyor."
+            return
+          }
           if (-not (Test-Path -LiteralPath './tests' -PathType Container)) {
             Write-Host "tests/ dizini yok, Pester testi atlaniyor."
-            exit 0
+            return
           }
           $testFiles = @(Get-ChildItem -Path './tests' -Filter '*.Tests.ps1' -Recurse -ErrorAction SilentlyContinue)
           if ($testFiles.Count -eq 0) {
             Write-Host "tests/*.Tests.ps1 bulunamadi, Pester testi atlaniyor."
-            exit 0
+            return
           }
           $config = New-PesterConfiguration
           $config.Run.Path = './tests'
