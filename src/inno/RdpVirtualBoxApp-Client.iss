@@ -122,8 +122,7 @@ Type: filesandordirs; Name: "{userappdata}\{#MyAppShortName}"
 Type: filesandordirs; Name: "{localappdata}\{#MyAppShortName}"
 Type: filesandordirs; Name: "{userdocs}\{#MyAppShortName}"
 
-; Registry entries the wizard may create
-Type: regkey; Key: "HKCU\Software\{#MyAppShortName}"
+; Not: Registry key kaldirma [Registry] section'inda otomatik yapilir.
 
 [Messages]
 ; English custom messages (also act as the default fallback).
