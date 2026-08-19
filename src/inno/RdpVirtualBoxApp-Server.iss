@@ -67,7 +67,6 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startmenu";  Description: "{cm:CreateStartMenu}";  GroupDescription: "{cm:AdditionalIcons}"; Flags: checked
 
 [Files]
 ; PowerShell modules (Server-side)
