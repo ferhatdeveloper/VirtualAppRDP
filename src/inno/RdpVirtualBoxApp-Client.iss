@@ -25,7 +25,7 @@
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
 ; Do not use the same AppId for other Inno Setup installers.
-AppId={9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1}
+AppId=9C7B8D3E-4321-8765-2109-RDPVB-CLIENT1
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}

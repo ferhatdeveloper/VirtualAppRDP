@@ -106,9 +106,15 @@ jobs:
           if (-not (Test-Path $isccPath)) {
             throw "ISCC.exe bulunamadı: $isccPath"
           }
-          # Inno Setup default çıktı yeri "src/inno/Output" -> "build/output" kopyalanır
-          & $isccPath "src\inno\RdpVirtualBoxApp-Client.iss"
+          Write-Host "ISCC version:"
+          & $isccPath --version 2>&1 | Out-Host
+          Write-Host "--- Client.iss head 50 ---"
+          Get-Content "src\inno\RdpVirtualBoxApp-Client.iss" -TotalCount 50 | Out-Host
+          Write-Host "--- ISCC Client output ---"
+          & $isccPath "src\inno\RdpVirtualBoxApp-Client.iss" 2>&1 | Tee-Object -FilePath iscc_client.log
+          Write-Host "--- ISCC exit: $LASTEXITCODE ---"
           if ($LASTEXITCODE -ne 0) {
+            Get-Content iscc_client.log -Tail 80 | Out-Host
             throw "Client setup build başarısız (exit=$LASTEXITCODE)."
           }
 
@@ -120,8 +126,13 @@ jobs:
           if (-not (Test-Path $isccPath)) {
             throw "ISCC.exe bulunamadı: $isccPath"
           }
-          & $isccPath "src\inno\RdpVirtualBoxApp-Server.iss"
+          Write-Host "--- Server.iss head 50 ---"
+          Get-Content "src\inno\RdpVirtualBoxApp-Server.iss" -TotalCount 50 | Out-Host
+          Write-Host "--- ISCC Server output ---"
+          & $isccPath "src\inno\RdpVirtualBoxApp-Server.iss" 2>&1 | Tee-Object -FilePath iscc_server.log
+          Write-Host "--- ISCC exit: $LASTEXITCODE ---"
           if ($LASTEXITCODE -ne 0) {
+            Get-Content iscc_server.log -Tail 80 | Out-Host
             throw "Server setup build başarısız (exit=$LASTEXITCODE)."
           }
 
