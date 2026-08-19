@@ -130,10 +130,10 @@ jobs:
         shell: bash
         run: find dist -type f -exec ls -la {} \;
 
-      - name: Create Release (draft)
+      - name: Create Release (published)
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
           files: dist/*
           generate_release_notes: true
           fail_on_unmatched_files: true
