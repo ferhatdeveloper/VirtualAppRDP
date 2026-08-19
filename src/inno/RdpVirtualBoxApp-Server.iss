@@ -99,7 +99,7 @@ Name: "{autodesktop}\{#MyAppName}";              Filename: "powershell.exe"; Par
 
 [Run]
 ; Optionally launch the wizard elevated at the end of installation
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; Description: "{cm:LaunchProgram},{#MyAppName}"; Flags: nowait postinstall skipuserselected
+Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\{#MyAppExeName}"""; Description: "{cm:LaunchProgram},{#MyAppName}"; Flags: nowait postinstall skipifsilent runhidden
 
 [UninstallDelete]
 ; Optional: clean up %ProgramData%\RdpVirtualBoxApp entirely on uninstall.
