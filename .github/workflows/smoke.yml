@@ -1,0 +1,25 @@
+name: Smoke Test
+on:
+  push:
+    branches:
+      - main
+      - smoke
+  workflow_dispatch:
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hello
+        run: |
+          echo "Runner is alive"
+          date
+          echo "OS: $(uname -a)"
+          echo "Disk: $(df -h / | tail -1)"
+          echo "---"
+          # Docker mevcut mu?
+          docker --version || echo "docker not installed"
+          echo "---"
+          # Network
+          curl -sS -o /dev/null -w "HTTPS to github: %{http_code}\n" https://github.com
