@@ -36,7 +36,10 @@ permissions:
 jobs:
   build:
     name: Build Setup Executables
-    runs-on: windows-latest
+    # windows-2022 pinned: pre-installed PowerShell 7.4.x + PSScriptAnalyzer 1.25 +
+    # Pester 5.x. 'windows-latest' artık Windows 2025 (pwsh 7.6) — çalışır ama
+    # flutter/edge-case'lerden kaçınmak için sabit pin tercih edildi.
+    runs-on: windows-2022
     timeout-minutes: 30
 
     steps:
@@ -44,28 +47,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------- 2. PowerShell 7.4 kurulumu ----------
-      # NOT: actions/setup-powershell GitHub Marketplace'ten kaldırıldığı için
-      # mchave3/setup-pwsh kullanılıyor (input adı: version).
-      - name: Setup PowerShell 7.4
-        uses: mchave3/setup-pwsh@v1.0.0
-        with:
-          version: '7.4'
-
-      # ---------- 3. PSScriptAnalyzer kurulumu ----------
-      - name: Install PSScriptAnalyzer
+      # ---------- 2. PowerShell sürüm doğrulama ----------
+      # actions/setup-powershell GitHub Marketplace'ten kaldırıldığı için
+      # setup adımı yok. windows-2022 runner pwsh 7.4.x ile geliyor.
+      - name: Show PowerShell version
         shell: pwsh
         run: |
-          Install-Module PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
-          Import-Module PSScriptAnalyzer
+          $v = $PSVersionTable.PSVersion
+          Write-Host "pwsh version: $v"
+          if ($v.Major -lt 7) {
+            throw "PowerShell 7+ gerekli, bulunan: $v"
+          }
+
+      # ---------- 3. PSScriptAnalyzer doğrulama (pre-installed) ----------
+      - name: Verify PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Import-Module PSScriptAnalyzer -ErrorAction Stop
           Write-Host "PSScriptAnalyzer: $((Get-Module PSScriptAnalyzer).Version)"
 
-      # ---------- 4. Pester kurulumu ----------
-      - name: Install Pester
+      # ---------- 4. Pester doğrulama (pre-installed) ----------
+      - name: Verify Pester
         shell: pwsh
         run: |
-          Install-Module Pester -Force -SkipPublisherCheck -Scope CurrentUser
-          Import-Module Pester
+          Import-Module Pester -ErrorAction Stop
           Write-Host "Pester: $((Get-Module Pester).Version)"
 
       # ---------- 5. Lint (PSScriptAnalyzer) ----------

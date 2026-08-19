@@ -36,17 +36,21 @@ jobs:
     # Daha temiz yaklaşım: aşağıdaki adımları çalıştır, sonra
     # release job'unda artifact indir.
     name: Build Artifacts
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup PowerShell 7.4
-        uses: mchave3/setup-pwsh@v1.0.0
-        with:
-          version: '7.4'
+      - name: Show PowerShell version
+        shell: pwsh
+        run: |
+          $v = $PSVersionTable.PSVersion
+          Write-Host "pwsh version: $v"
+          if ($v.Major -lt 7) {
+            throw "PowerShell 7+ gerekli, bulunan: $v"
+          }
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
@@ -90,7 +94,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 15
 
     steps:
