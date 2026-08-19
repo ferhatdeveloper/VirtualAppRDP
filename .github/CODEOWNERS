@@ -3,9 +3,34 @@
 
 * @ferhatdeveloper
 
-# Daha ayrıntılı sahiplenme örneği (ileride açabilirsiniz):
+# Sunucu tarafı modüller (RDS altyapısı, sertifika, yayın, firewall)
 # /src/powershell/server/  @ferhatdeveloper
+
+# İstemci tarafı modüller (probe, wizard, .rdp üretici, web kısayolları)
 # /src/powershell/client/  @ferhatdeveloper
+
+# Inno Setup installer scriptleri
 # /src/inno/               @ferhatdeveloper
+
+# Konfigürasyon şablonları
+# /src/config/             @ferhatdeveloper
+
+# Varlıklar (ikon, banner)
+# /src/assets/             @ferhatdeveloper
+
+# Birim testleri
+# /tests/                  @ferhatdeveloper
+
+# Kullanıcı dokümantasyonu (Markdown + GitHub Pages)
 # /docs/                   @ferhatdeveloper
+
+# GitHub Actions workflow'ları ve repo ayarları
 # /.github/workflows/      @ferhatdeveloper
+# /.github/CODEOWNERS      @ferhatdeveloper
+# /.github/ISSUE_TEMPLATE/ @ferhatdeveloper
+
+# Proje kökü
+# /README.md               @ferhatdeveloper
+# /CHANGELOG.md            @ferhatdeveloper
+# /LICENSE                 @ferhatdeveloper
+# /SECURITY.md             @ferhatdeveloper

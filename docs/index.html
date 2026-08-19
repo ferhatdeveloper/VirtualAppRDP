@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rdp Virtual Box App — Docs</title>
+<meta name="description" content="Rdp Virtual Box App: Herhangi bir uygulamayı (ERP, muhasebe, raporlama, özel exe) Windows Server üzerinden RemoteApp olarak yayınlayın. İki parçalı kurulum: Server-side + Client-side. Native RDP ve HTML5 erişim seçenekleri." />
+<link rel="icon" href="https://raw.githubusercontent.com/ferhatdeveloper/VirtualAppRDP/main/src/assets/icon.ico" />
+<style>
+  :root {
+    --bg: #f6f8fa;
+    --panel: #ffffff;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #57606a;
+    --accent: #0969da;
+    --accent-bg: #ddf4ff;
+    --code-bg: #f6f8fa;
+    --shadow: 0 1px 3px rgba(31, 35, 40, 0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #2f81f7;
+      --accent-bg: #0c2d6b;
+      --code-bg: #161b22;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+      Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+  header {
+    text-align: center;
+    padding: 40px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  header h1 { margin: 0 0 8px; font-size: 2.2rem; }
+  header .tagline {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0 auto 16px;
+    max-width: 720px;
+  }
+  .badges {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-block; padding: 4px 10px; border-radius: 999px;
+    background: var(--accent-bg); color: var(--accent);
+    font-size: 0.8rem; font-weight: 600; text-decoration: none;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 1.25rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .link-tile {
+    display: block;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .link-tile:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .link-tile strong { color: var(--accent); display: block; margin-bottom: 4px; }
+  .link-tile span { color: var(--muted); font-size: 0.9rem; }
+  code, pre {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+      "Liberation Mono", monospace;
+    background: var(--code-bg);
+    border-radius: 4px;
+  }
+  code { padding: 2px 6px; font-size: 0.9em; }
+  pre {
+    padding: 14px 16px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  pre code { background: none; padding: 0; }
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0 28px;
+    text-align: center;
+    overflow-x: auto;
+  }
+  .diagram svg { max-width: 100%; height: auto; }
+  .steps { counter-reset: step; padding-left: 0; list-style: none; }
+  .steps li {
+    counter-increment: step;
+    padding: 10px 14px 10px 44px;
+    position: relative;
+    border-left: 2px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: -14px;
+    top: 8px;
+    width: 28px; height: 28px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 600;
+    box-shadow: 0 0 0 4px var(--bg);
+  }
+  .footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Rdp Virtual Box App</h1>
+    <p class="tagline">
+      Herhangi bir uygulamayı (ERP, muhasebe, raporlama, özel exe) Windows Server üzerinden
+      <strong>RemoteApp</strong> olarak yayınlayın. İki parçalı kurulum — server tarafı + client tarafı —
+      hem <strong>Native RDP</strong> hem de <strong>HTML5</strong> erişim.
+    </p>
+    <div class="badges">
+      <a class="badge" href="https://github.com/ferhatdeveloper/VirtualAppRDP/releases/tag/v1.0.0">v1.0.0</a>
+      <a class="badge" href="https://github.com/ferhatdeveloper/VirtualAppRDP/blob/main/LICENSE">MIT</a>
+      <a class="badge" href="https://github.com/ferhatdeveloper/VirtualAppRDP">Repo</a>
+      <a class="badge" href="https://github.com/ferhatdeveloper/VirtualAppRDP/issues">Issues</a>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>Quick Start</h2>
+    <ol class="steps">
+      <li><strong>Server tarafını hazırlayın</strong> — Windows Server 2016/2019/2022, RDS rolleri, sertifika.</li>
+      <li><strong>Server Setup EXE</strong>'yi yönetici olarak çalıştırın — 7 adımlı sihirbaz.</li>
+      <li><strong>Client Setup EXE</strong>'yi son kullanıcı bilgisayarına dağıtın — 4 adımlı sihirbaz.</li>
+      <li>Kullanıcı, Start Menu kısayollarından veya HTML5 web arayüzünden uygulamaları açar.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Bağlantı Stratejileri</h2>
+    <div class="diagram">
+```mermaid
+flowchart TD
+    A[Kullanıcı] --> B{Hangi senaryo?}
+    B -->|LAN / küçük ofis| C[Direct RDP - Port 3389]
+    B -->|Dışarıdan kurumsal| D[RD Gateway - HTTPS 443]
+    B -->|Lisans yok, HTML5| E[Apache Guacamole - HTTPS 8443]
+    B -->|NAT arkası| F[Tailscale mesh VPN]
+    B -->|Dışarıya port açmadan| G[Cloudflare Tunnel]
+    B -->|Birden fazla| H[Hybrid]
+```
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Dokümantasyon</h2>
+    <div class="grid">
+      <a class="link-tile" href="server-requirements.md">
+        <strong>Server Gereksinimleri</strong>
+        <span>Donanım, yazılım, lisans gereksinimleri (TR / EN)</span>
+      </a>
+      <a class="link-tile" href="client-requirements.md">
+        <strong>Client Gereksinimleri</strong>
+        <span>Windows 10/11, RDP client, tarayıcı</span>
+      </a>
+      <a class="link-tile" href="server-setup-guide.md">
+        <strong>Server Kurulum Kılavuzu</strong>
+        <span>IT admin için 7 adımlı sihirbaz</span>
+      </a>
+      <a class="link-tile" href="client-setup-guide.md">
+        <strong>Client Kurulum Kılavuzu</strong>
+        <span>Son kullanıcı için 4 adımlı sihirbaz</span>
+      </a>
+      <a class="link-tile" href="licensing-and-rdweb.md">
+        <strong>Lisanslama ve RD Web</strong>
+        <span>RD Web Access vs Guacamole karşılaştırması</span>
+      </a>
+      <a class="link-tile" href="troubleshooting.md">
+        <strong>Sorun Giderme</strong>
+        <span>Yaygın hatalar ve çözümler</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Bağlantı Stratejisi Detayları</h2>
+    <table style="width:100%; border-collapse:collapse;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border); text-align:left;">
+          <th style="padding:8px;">Strateji</th>
+          <th style="padding:8px;">Port</th>
+          <th style="padding:8px;">Senaryo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">Direct RDP</td><td style="padding:8px;"><code>TCP 3389</code></td><td style="padding:8px;">LAN, NDA'lı ortam</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">RD Gateway</td><td style="padding:8px;"><code>TCP 443</code></td><td style="padding:8px;">Kurumsal, firewall dostu</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">Apache Guacamole</td><td style="padding:8px;"><code>TCP 8443</code></td><td style="padding:8px;">HTML5 fallback, lisanssız</td></tr>
+        <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;">Tailscale</td><td style="padding:8px;"><code>UDP 41641</code></td><td style="padding:8px;">NAT arkası, sıfır konfig</td></tr>
+        <tr><td style="padding:8px;">Cloudflare Tunnel</td><td style="padding:8px;"><code>Outbound 443</code></td><td style="padding:8px;">Dışarıya port açmadan</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>İndirme (v1.0.0)</h2>
+    <p>
+      <a href="https://github.com/ferhatdeveloper/VirtualAppRDP/releases/tag/v1.0.0">
+        GitHub Releases — v1.0.0
+      </a>'den edinin:
+    </p>
+    <pre><code>RdpVirtualBoxApp-Server-v1.0.0.exe   # ~8-12 MB, admin kurulumu
+RdpVirtualBoxApp-Client-v1.0.0.exe   # ~5-8 MB,  kullanıcı kurulumu
+SHA256SUMS.txt                       # doğrulama</code></pre>
+  </section>
+
+  <div class="footer">
+    <p>
+      <a href="https://github.com/ferhatdeveloper/VirtualAppRDP">Repo</a> ·
+      <a href="https://github.com/ferhatdeveloper/VirtualAppRDP/issues">Issues</a> ·
+      <a href="https://github.com/ferhatdeveloper/VirtualAppRDP/blob/main/CHANGELOG.md">Changelog</a>
+    </p>
+    <p>MIT Lisansı · © 2026 ferhatdeveloper</p>
+  </div>
+
+</div>
+</body>
+</html>
