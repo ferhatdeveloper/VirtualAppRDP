@@ -60,7 +60,7 @@ $appB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes((Join-Path $e
 $deskB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes((Join-Path $exfin 'Desktop.rdp')))
 $now = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 $feed = @"
-<ResourceCollection PubDate="$now" SchemaVersion="1.1" xmlns="http://schemas.microsoft.com/ts/2007/05/tswf">
+<ResourceCollection PubDate="$now" SchemaVersion="2.1" xmlns="http://schemas.microsoft.com/ts/2007/05/tswf">
   <Publisher LastUpdated="$now" Name="EXFIN RemoteAPP" ID="ARZ" Description="EXFIN RemoteAPP">
     <Resources>
       <Resource ID="Tiger3Ent" Alias="Tiger3Ent" Title="Tiger3 Enterprise" Type="RemoteApp" ShowByDefault="true">
@@ -76,6 +76,10 @@ $feed = @"
         </HostingTerminalServers>
       </Resource>
       <Resource ID="ARZDesktop" Alias="ARZDesktop" Title="ARZ Masaustu" Type="Desktop" ShowByDefault="true">
+        <Icons>
+          <IconRaw FileType="Png" FileURL="/RDWeb/Pages/exfin/Desktop.png" />
+          <Icon32 Dimensions="32x32" FileType="Png" FileURL="/RDWeb/Pages/exfin/Desktop.png" />
+        </Icons>
         <HostingTerminalServers>
           <HostingTerminalServer>
             <ResourceFile FileExtension=".rdp" URL="/RDWeb/Pages/exfin/Desktop.rdp"><Content>$deskB64</Content></ResourceFile>

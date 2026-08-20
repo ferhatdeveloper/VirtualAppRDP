@@ -89,10 +89,10 @@ Windows ve macOS istemcisiyle ayni mantik:
 
 1. **Sunucu** — IP veya DNS, Probe portu (varsayilan **8444**), Windows kullanici adi, istege bagli Bearer token. HTTPS kutusu yalnizca gercek sertifika (Let's Encrypt) varsa.
 2. **Tarama** — `GET /health`, `GET /api/apps`, `GET /rdp`. Sunucu adi, surum, RDP portu ve musteri listesi.
-3. **Uygulama** — yayinli RemoteApp kartlari + Public / LAN / VPN hedefi.
-4. **Baglan** — `POST /api/clients` ile cihaz kaydi, `.rdp` indirme, Microsoft RD Client ile acma.
+3. **Uygulama** — yayinli RemoteApp kartlari + **RD Gateway (443)** / Public / LAN / VPN / Web (tarayici) hedefi. Disaridan **Gateway** secin.
+4. **Baglan** — `POST /api/clients` ile cihaz kaydi. Gateway/Public/LAN/VPN icin `.rdp` + Microsoft RD Client. **Web** icin HTML5 tarayici (`/web` veya RD Web Client). Gateway sertifikasi `GET /gateway.cer`.
 
-**Web portalini ac** dugmesi `http://<sunucu>:8444/download` yonetim panelini tarayicida acar (yonetici icin).
+**Web giris sayfasini ac** dugmesi `http://<sunucu>:8444/web` kullanici sayfasini tarayicida acar.
 
 Windows parolasi uygulamada saklanmaz; RDP istemcisi sorar.
 
@@ -114,8 +114,10 @@ Yuklu degilse 4. adimda uyari ve magaza baglantisi gorunur.
 |---|---|---|
 | Probe / panel | LAN IP veya genel IP | **8444** HTTP |
 | Caddy HTTPS (opsiyonel) | ayni | **8445** — ic CA Android'de guvenilmez; HTTP 8444 kullanin |
+| RD Gateway | `gatewayHost` / genel IP | **443** — Android'de onerilen WAN yolu |
+| HTML5 Web | genel IP | **443** `/RDWeb/webclient/` |
 | RDP (LAN) | `lanIp` | `lanRdpPort` / dinleme portu |
-| RDP (WAN) | `publicIp` | musterinin `rdpPort` degeri (NAT) |
+| RDP (WAN direct) | `publicIp` | musterinin `rdpPort` degeri (NAT, or. 55812) |
 
 Yoneticinin **Istemciler** sekmesinde `requireApproval` aciksa, WAN uzerinden `.rdp` almak icin cihazin **Izin ver** ile onaylanmasi gerekir. Android `ANDROID_ID` + kullanici adi ile kaydolur.
 
@@ -130,7 +132,8 @@ Yoneticinin **Istemciler** sekmesinde `requireApproval` aciksa, WAN uzerinden `.
 | `.rdp` acilmiyor | RD Client yok | Play Store'dan Microsoft Remote Desktop |
 | HTTPS hata | Caddy ic sertifika | HTTP 8444; HTTPS kutusunu kapatın |
 | Uygulama listesi bos | TSAppAllowList bos | Panel > Uygulamalar ile EXE yayinlayin |
-| RDP baglanamiyor | Yanlis Public/LAN/VPN | LAN'daysaniz LAN; disaridan Public + NAT portu |
+| RDP baglanamiyor | Yanlis Public/LAN/VPN | LAN'daysaniz LAN; disaridan **RD Gateway (443)** + NAT 443 |
+| Sertifika uyarisi | Gateway self-signed | Uygulamada **Gateway sertifikasini indir**, Android'e kullanici CA olarak kurun |
 
 ---
 

@@ -15,6 +15,7 @@ import com.exfin.remoteapp.data.ProbeApi
 import com.exfin.remoteapp.data.ProbeException
 import com.exfin.remoteapp.data.RdpFileInfo
 import com.exfin.remoteapp.data.RemoteAppInfo
+import com.exfin.remoteapp.data.WebInfo
 import com.exfin.remoteapp.rdp.RdpLauncher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -125,7 +126,7 @@ class WizardViewModel(application: Application) : AndroidViewModel(application) 
                 _state.update {
                     val alias = it.selectedAlias.ifBlank { result.apps.firstOrNull()?.alias.orEmpty() }
                     val kinds = result.files.filter { f -> f.alias.equals(alias, true) }.map { f -> f.kind.lowercase() }
-                    val kind = if (it.kind.lowercase() in kinds) it.kind else (kinds.firstOrNull() ?: it.kind)
+                    val kind = pickKind(kinds, it.kind)
                     it.copy(
                         probing = false,
                         health = result.health,
@@ -162,23 +163,36 @@ class WizardViewModel(application: Application) : AndroidViewModel(application) 
                     ?: throw ProbeException("Bir uygulama seçin.")
                 val file = s.rdpFiles.firstOrNull {
                     it.alias.equals(s.selectedAlias, true) && it.kind.equals(s.kind, true)
-                } ?: throw ProbeException("Bu uygulama için ${s.kind.uppercase()} .rdp kaydı yok.")
+                } ?: throw ProbeException("Bu uygulama için ${s.kind.uppercase()} kaydı yok.")
                 val user = s.username.ifBlank { "android" }
                 val clientKey = (machineId + "|" + user).lowercase()
+                val isWeb = file.kind.equals("web", true) || file.url.contains("/web")
                 withContext(Dispatchers.IO) {
                     val api = api()
                     runCatching {
                         api.registerClient(machineId, deviceName, user, listOf(app))
                     }
-                    val content = api.downloadRdp(file.url, clientKey)
-                    withContext(Dispatchers.Main) {
-                        RdpLauncher.saveAndOpen(appCtx, file.fileName.ifBlank { "${app.alias}.rdp" }, content)
+                    if (isWeb) {
+                        val web = runCatching { api.webStatus(s.customerId.ifBlank { null }) }.getOrNull()
+                        val url = pickWebUrl(s.host, s.customers.firstOrNull { it.id == s.customerId }, web, api.baseUrl, file.url)
+                        withContext(Dispatchers.Main) {
+                            RdpLauncher.openPortal(appCtx, url)
+                        }
+                    } else {
+                        val content = api.downloadRdp(file.url, clientKey)
+                        withContext(Dispatchers.Main) {
+                            RdpLauncher.saveAndOpen(appCtx, file.fileName.ifBlank { "${app.alias}.rdp" }, content)
+                        }
                     }
                 }
                 _state.update {
                     it.copy(
                         connecting = false,
-                        connectMessage = "RDP dosyası açıldı: ${file.fileName.ifBlank { app.name }}"
+                        connectMessage = if (isWeb) {
+                            "Web HTML5 tarayıcıda açıldı."
+                        } else {
+                            "RDP dosyası açıldı: ${file.fileName.ifBlank { app.name }}"
+                        }
                     )
                 }
             } catch (ex: Exception) {
@@ -194,7 +208,44 @@ class WizardViewModel(application: Application) : AndroidViewModel(application) 
         val s = _state.value
         val scheme = if (s.useHttps) "https" else "http"
         val port = s.port.toIntOrNull() ?: 8444
-        RdpLauncher.openPortal(getApplication(), "$scheme://${s.host.trim()}:$port/download")
+        RdpLauncher.openPortal(getApplication(), "$scheme://${s.host.trim()}:$port/web")
+    }
+
+    fun openGatewayCert() {
+        persistServer()
+        val s = _state.value
+        val scheme = if (s.useHttps) "https" else "http"
+        val port = s.port.toIntOrNull() ?: 8444
+        RdpLauncher.openPortal(getApplication(), "$scheme://${s.host.trim()}:$port/gateway.cer")
+    }
+
+    private fun pickKind(kinds: List<String>, saved: String): String {
+        val lower = kinds.map { it.lowercase() }
+        if (saved.lowercase() in lower) return saved.lowercase()
+        for (k in listOf("gateway", "lan", "vpn", "public", "web")) {
+            if (k in lower) return k
+        }
+        return lower.firstOrNull() ?: saved.ifBlank { "gateway" }
+    }
+
+    private fun pickWebUrl(
+        probeHost: String,
+        customer: CustomerInfo?,
+        web: WebInfo?,
+        baseUrl: String,
+        relative: String
+    ): String {
+        val host = probeHost.trim()
+        val lan = web?.launchLan.orEmpty()
+        val pub = web?.launchPublic.orEmpty()
+        val lanIp = customer?.lanIp.orEmpty()
+        if (lan.isNotBlank() && (host == lanIp || host.startsWith("192.168.") || host.startsWith("10.") || host == "127.0.0.1")) {
+            return lan
+        }
+        if (pub.isNotBlank()) return pub
+        if (lan.isNotBlank()) return lan
+        val path = if (relative.startsWith("/")) relative else "/$relative"
+        return baseUrl + path
     }
 
     private data class ProbeBundle(

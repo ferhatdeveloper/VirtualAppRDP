@@ -76,7 +76,10 @@ class ProbeApi(
                     lanIp = o.optString("lanIp"),
                     vpnIp = o.optString("vpnIp"),
                     rdpPort = o.optInt("rdpPort"),
-                    lanRdpPort = o.optInt("lanRdpPort")
+                    lanRdpPort = o.optInt("lanRdpPort"),
+                    connectMode = o.optString("connectMode").ifBlank { "direct" },
+                    gatewayHost = o.optString("gatewayHost"),
+                    gatewayPort = o.optInt("gatewayPort", 443)
                 )
             )
         }
@@ -111,6 +114,21 @@ class ProbeApi(
             )
         }
         return RdpIndex(customerId = cid, files = files)
+    }
+
+    fun webStatus(customerId: String?): WebInfo {
+        val path = if (customerId.isNullOrBlank()) "/api/web" else "/api/web?customer=${enc(customerId)}"
+        val json = getJson(path)
+        return WebInfo(
+            resolvedKind = json.optString("resolvedKind"),
+            gatewayHost = json.optString("gatewayHost"),
+            gatewayPort = json.optInt("gatewayPort", 443),
+            gatewayRunning = json.optBoolean("gatewayRunning"),
+            rdWebHtml5 = json.optBoolean("rdWebHtml5"),
+            launchLan = json.optString("launchLan"),
+            launchPublic = json.optString("launchPublic"),
+            hint = json.optString("hint")
+        )
     }
 
     fun iconPng(alias: String): ByteArray? {

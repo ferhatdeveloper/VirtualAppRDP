@@ -26,7 +26,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -234,7 +236,7 @@ private fun StepProbe(state: WizardUiState, vm: WizardViewModel) {
 private fun StepApps(state: WizardUiState, vm: WizardViewModel) {
     Text("Adım 3 · RemoteApp seçimi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
-    Text("Yayınlı uygulamalardan birini ve bağlantı yolunu seçin.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("Yayınlı uygulamalardan birini ve bağlantı yolunu seçin. Dışarıdan RD Gateway (443) önerilir.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(12.dp))
     if (state.apps.isEmpty()) {
         StatusLine("Henüz uygulama yok. Önce sunucuyu tarayın.", error = false)
@@ -293,6 +295,8 @@ private fun StepApps(state: WizardUiState, vm: WizardViewModel) {
                             when (kind) {
                                 "vpn" -> Icons.Default.VpnKey
                                 "public" -> Icons.Default.Cloud
+                                "gateway" -> Icons.Default.Security
+                                "web" -> Icons.Default.Language
                                 else -> Icons.Default.PhoneAndroid
                             },
                             contentDescription = null
@@ -312,18 +316,24 @@ private fun StepApps(state: WizardUiState, vm: WizardViewModel) {
 @Composable
 private fun StepConnect(state: WizardUiState, vm: WizardViewModel) {
     val context = LocalContext.current
+    val isWeb = state.kind.equals("web", true)
+    val isGateway = state.kind.equals("gateway", true)
     Text("Adım 4 · Bağlan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
     Text(
-        "Cihaz sunucuya kaydedilir, .rdp indirilir ve Microsoft Remote Desktop ile açılır. Windows parolası RDP istemcisinde sorulur.",
+        if (isWeb) {
+            "HTML5 RD Web tarayıcıda açılır. Windows parolası web girişinde sorulur."
+        } else {
+            "Cihaz kaydedilir, .rdp indirilir ve Microsoft Remote Desktop ile açılır. Dışarıdan RD Gateway (TCP 443) kullanın. Windows parolası RDP istemcisinde sorulur."
+        },
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Spacer(Modifier.height(16.dp))
     InfoCard("Cihaz", vm.deviceName)
     InfoCard("Uygulama", state.apps.firstOrNull { it.alias.equals(state.selectedAlias, true) }?.name ?: "—")
-    InfoCard("Yol", state.kind.uppercase())
+    InfoCard("Yol", state.rdpFiles.firstOrNull { it.alias.equals(state.selectedAlias, true) && it.kind.equals(state.kind, true) }?.label ?: state.kind.uppercase())
     Spacer(Modifier.height(8.dp))
-    if (!state.rdClientInstalled) {
+    if (!isWeb && !state.rdClientInstalled) {
         StatusLine("Microsoft Remote Desktop yüklü değil. Play Store’dan ücretsiz kurun.", error = true)
         Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = { RdpLauncher.openPlayStore(context) }, modifier = Modifier.fillMaxWidth()) {
@@ -340,11 +350,23 @@ private fun StepConnect(state: WizardUiState, vm: WizardViewModel) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
             Spacer(Modifier.width(8.dp))
         }
-        Text(if (state.connecting) "Bağlanılıyor…" else "Kaydet ve bağlan")
+        Text(
+            when {
+                state.connecting -> "Bağlanılıyor…"
+                isWeb -> "Web ile aç"
+                else -> "Kaydet ve bağlan"
+            }
+        )
     }
     Spacer(Modifier.height(8.dp))
     OutlinedButton(onClick = { vm.openPortal() }, enabled = state.host.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-        Text("Web portalını aç")
+        Text("Web giriş sayfasını aç")
+    }
+    if (isGateway) {
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = { vm.openGatewayCert() }, enabled = state.host.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+            Text("Gateway sertifikasını indir")
+        }
     }
     state.connectMessage?.let {
         Spacer(Modifier.height(12.dp))
