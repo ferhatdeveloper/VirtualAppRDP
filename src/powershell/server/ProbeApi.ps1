@@ -294,6 +294,11 @@ function Get-CustomerPortalConfig {
                 vpnIp      = $ep.vpn
                 rdpPort    = $listen
                 lanRdpPort = $listen
+                connectMode = 'direct'
+                gatewayHost = ''
+                gatewayPort = 443
+                webKind     = 'auto'
+                webUrl      = ''
             }
         )
     }
@@ -316,6 +321,11 @@ function Get-CustomerPortalConfig {
                     vpnIp      = $(if ($c.vpnIp) { [string]$c.vpnIp } else { $ep.vpn })
                     rdpPort    = $(if ($c.rdpPort) { [int]$c.rdpPort } else { $listen })
                     lanRdpPort = $(if ($c.lanRdpPort) { [int]$c.lanRdpPort } else { $listen })
+                    connectMode = $(if ($c.connectMode) { [string]$c.connectMode } else { 'direct' })
+                    gatewayHost = $(if ($c.gatewayHost) { [string]$c.gatewayHost } else { '' })
+                    gatewayPort = $(if ($c.gatewayPort) { [int]$c.gatewayPort } else { 443 })
+                    webKind     = $(if ($c.webKind) { [string]$c.webKind } else { 'auto' })
+                    webUrl      = $(if ($c.webUrl) { [string]$c.webUrl } else { '' })
                 })
             }
             if ($list.Count -gt 0) { $defaults.customers = $list.ToArray() }
@@ -403,6 +413,11 @@ function Save-CustomerPortalFromJson {
         $vpnIp = ''
         $rdpPort = [int]$cfg.listenRdpPort
         $lanRdpPort = [int]$cfg.listenRdpPort
+        $connectMode = 'direct'
+        $gatewayHost = ''
+        $gatewayPort = 443
+        $webKind = 'auto'
+        $webUrl = ''
         if ($existing) {
             if ($existing['name']) { $name = [string]$existing['name'] }
             if ($existing['publicIp']) { $publicIp = [string]$existing['publicIp'] }
@@ -410,6 +425,11 @@ function Save-CustomerPortalFromJson {
             if ($existing['vpnIp']) { $vpnIp = [string]$existing['vpnIp'] }
             if ($existing['rdpPort']) { $rdpPort = [int]$existing['rdpPort'] }
             if ($existing['lanRdpPort']) { $lanRdpPort = [int]$existing['lanRdpPort'] }
+            if ($existing['connectMode']) { $connectMode = [string]$existing['connectMode'] }
+            if ($existing['gatewayHost']) { $gatewayHost = [string]$existing['gatewayHost'] }
+            if ($existing['gatewayPort']) { $gatewayPort = [int]$existing['gatewayPort'] }
+            if ($existing['webKind']) { $webKind = [string]$existing['webKind'] }
+            if ($existing['webUrl']) { $webUrl = [string]$existing['webUrl'] }
         }
         if ($c.PSObject.Properties['name'] -and $c.name) { $name = [string]$c.name }
         if ($c.PSObject.Properties['publicIp'] -and $c.publicIp) { $publicIp = [string]$c.publicIp }
@@ -417,14 +437,24 @@ function Save-CustomerPortalFromJson {
         if ($c.PSObject.Properties['vpnIp'] -and $c.vpnIp) { $vpnIp = [string]$c.vpnIp }
         if ($c.PSObject.Properties['rdpPort'] -and $c.rdpPort) { $rdpPort = [int]$c.rdpPort }
         if ($c.PSObject.Properties['lanRdpPort'] -and $c.lanRdpPort) { $lanRdpPort = [int]$c.lanRdpPort }
+        if ($c.PSObject.Properties['connectMode'] -and $c.connectMode) { $connectMode = [string]$c.connectMode }
+        if ($c.PSObject.Properties['gatewayHost']) { $gatewayHost = [string]$c.gatewayHost }
+        if ($c.PSObject.Properties['gatewayPort'] -and $c.gatewayPort) { $gatewayPort = [int]$c.gatewayPort }
+        if ($c.PSObject.Properties['webKind'] -and $c.webKind) { $webKind = [string]$c.webKind }
+        if ($c.PSObject.Properties['webUrl']) { $webUrl = [string]$c.webUrl }
         $merged = [ordered]@{
-            id         = $id
-            name       = $name
-            publicIp   = $publicIp
-            lanIp      = $lanIp
-            vpnIp      = $vpnIp
-            rdpPort    = $rdpPort
-            lanRdpPort = $lanRdpPort
+            id          = $id
+            name        = $name
+            publicIp    = $publicIp
+            lanIp       = $lanIp
+            vpnIp       = $vpnIp
+            rdpPort     = $rdpPort
+            lanRdpPort  = $lanRdpPort
+            connectMode = $connectMode
+            gatewayHost = $gatewayHost
+            gatewayPort = $gatewayPort
+            webKind     = $webKind
+            webUrl      = $webUrl
         }
         $map[$id] = $merged
     }
@@ -495,6 +525,7 @@ function Register-TsRemoteApp {
     Set-ItemProperty -LiteralPath $key -Name 'CommandLineSetting' -Value 1 -Type DWord -Force
     Set-ItemProperty -LiteralPath $key -Name 'RequiredCommandLine' -Value '' -Type String -Force
     Set-ItemProperty -LiteralPath $key -Name 'ShowInTSWA' -Value 1 -Type DWord -Force
+    Set-ItemProperty -LiteralPath $key -Name 'ShowInTSWebAccess' -Value 1 -Type DWord -Force
     Set-ItemProperty -LiteralPath $key -Name 'Alias' -Value $safe -Type String -Force
     return [ordered]@{
         alias     = $safe
@@ -1561,7 +1592,9 @@ function New-RemoteAppRdpText {
         [int]$Port = 3389,
         [Parameter(Mandatory)][string]$Alias,
         [string]$DisplayName,
-        [string]$UserName
+        [string]$UserName,
+        [string]$GatewayHost,
+        [int]$GatewayPort = 443
     )
     if ([string]::IsNullOrWhiteSpace($DisplayName)) { $DisplayName = $Alias }
     if ([string]::IsNullOrWhiteSpace($UserName)) {
@@ -1574,7 +1607,9 @@ function New-RemoteAppRdpText {
         "server port:i:$Port"
         "username:s:$UserName"
         'prompt for credentials:i:1'
-        'authentication level:i:2'
+        'promptcredentialonce:i:1'
+        'authentication level:i:0'
+        'enablecredsspsupport:i:1'
         'negotiate security layer:i:1'
         'remoteapplicationmode:i:1'
         "remoteapplicationprogram:s:||$Alias"
@@ -1592,6 +1627,19 @@ function New-RemoteAppRdpText {
         'bandwidthautodetect:i:1'
         'networkautodetect:i:1'
     )
+    if (-not [string]::IsNullOrWhiteSpace($GatewayHost)) {
+        $gh = $GatewayHost.Trim()
+        if ($GatewayPort -ge 1 -and $GatewayPort -ne 443) {
+            $gh = '{0}:{1}' -f $gh, $GatewayPort
+        }
+        $lines += @(
+            "gatewayhostname:s:$gh"
+            'gatewayusagemethod:i:1'
+            'gatewayprofileusagemethod:i:1'
+            'gatewaycredentialssource:i:0'
+            'promptcredentialonce:i:1'
+        )
+    }
     return (($lines -join "`r`n") + "`r`n")
 }
 
@@ -1629,8 +1677,17 @@ function Get-RemoteAppDownloadItems {
         if ($vpnIp) {
             $targets += @{ Kind = 'vpn'; Label = 'VPN'; Host = $vpnIp; Port = $lanPort; File = "$alias-VPN.rdp"; Url = "/rdp/$alias-vpn.rdp?$q" }
         }
+        $gwHost = [string]$cust['gatewayHost']
+        if ([string]::IsNullOrWhiteSpace($gwHost)) { $gwHost = $publicIp }
+        $gwPort = 443
+        if ($cust['gatewayPort']) { [void][int]::TryParse([string]$cust['gatewayPort'], [ref]$gwPort) }
+        if ($gwPort -lt 1) { $gwPort = 443 }
+        if ($gwHost) {
+            $targets += @{ Kind = 'gateway'; Label = 'RD Gateway (443)'; Host = $gwHost; Port = $gwPort; File = "$alias-Gateway.rdp"; Url = "/rdp/$alias-gateway.rdp?$q" }
+        }
+        $targets += @{ Kind = 'web'; Label = 'Web (tarayici)'; Host = $publicIp; Port = 443; File = ''; Url = "/web?$q" }
         foreach ($t in $targets) {
-            if ([string]::IsNullOrWhiteSpace($t.Host)) { continue }
+            if ($t.Kind -ne 'web' -and [string]::IsNullOrWhiteSpace($t.Host)) { continue }
             [void]$items.Add([ordered]@{
                 alias       = $alias
                 name        = $name
@@ -1674,10 +1731,12 @@ function Get-RemoteAppRdpDownload {
     if ($lower -eq 'public.rdp' -or $lower -eq 'wan.rdp') { $kind = 'public' }
     elseif ($lower -eq 'lan.rdp') { $kind = 'lan' }
     elseif ($lower -eq 'vpn.rdp') { $kind = 'vpn' }
-    elseif ($lower -match '^([a-z0-9._-]+)-(public|wan|lan|vpn)\.rdp$') {
+    elseif ($lower -eq 'gateway.rdp' -or $lower -eq 'gw.rdp') { $kind = 'gateway' }
+    elseif ($lower -match '^([a-z0-9._-]+)-(public|wan|lan|vpn|gateway|gw)\.rdp$') {
         $alias = $Matches[1]
         $kind = $Matches[2]
         if ($kind -eq 'wan') { $kind = 'public' }
+        if ($kind -eq 'gw') { $kind = 'gateway' }
     } else {
         return $null
     }
@@ -1703,19 +1762,38 @@ function Get-RemoteAppRdpDownload {
     if ($wanPort -lt 1) { $wanPort = [int]$cfg.listenRdpPort }
     if ($lanPort -lt 1) { $lanPort = [int]$cfg.listenRdpPort }
 
+    $gwHost = [string]$cust['gatewayHost']
+    if ([string]::IsNullOrWhiteSpace($gwHost)) { $gwHost = $publicIp }
+    $gwPort = 443
+    if ($cust['gatewayPort']) { [void][int]::TryParse([string]$cust['gatewayPort'], [ref]$gwPort) }
+    if ($gwPort -lt 1) { $gwPort = 443 }
+
     $hostIp = $null
     $port = $lanPort
+    $useGw = $null
     switch ($kind) {
-        'public' { $hostIp = $publicIp; $port = $wanPort }
-        'lan'    { $hostIp = $lanIp; $port = $lanPort }
-        'vpn'    { $hostIp = $vpnIp; $port = $lanPort }
+        'public'  { $hostIp = $publicIp; $port = $wanPort }
+        'lan'     { $hostIp = $lanIp; $port = $lanPort }
+        'vpn'     { $hostIp = $vpnIp; $port = $lanPort }
+        'gateway' {
+            $hostIp = $env:COMPUTERNAME
+            if ([string]::IsNullOrWhiteSpace($hostIp)) { $hostIp = $lanIp }
+            $port = [int]$cfg.listenRdpPort
+            if ($port -lt 1) { $port = 3389 }
+            $useGw = $gwHost
+        }
     }
     if ($RdpPort -ge 1 -and $RdpPort -le 65535) { $port = $RdpPort }
     if ([string]::IsNullOrWhiteSpace($hostIp)) { return $null }
 
-    $outName = '{0}-{1}.rdp' -f $appAlias, ($(if ($kind -eq 'public') { 'Public' } elseif ($kind -eq 'lan') { 'LAN' } else { 'VPN' }))
-    $text = New-RemoteAppRdpText -TargetIp $hostIp -Port $port -Alias $appAlias -DisplayName $appName
-    return [ordered]@{ FileName = $outName; Content = $text; Host = $hostIp; Port = $port }
+    $outName = '{0}-{1}.rdp' -f $appAlias, ($(
+        if ($kind -eq 'public') { 'Public' }
+        elseif ($kind -eq 'lan') { 'LAN' }
+        elseif ($kind -eq 'gateway') { 'Gateway' }
+        else { 'VPN' }
+    ))
+    $text = New-RemoteAppRdpText -TargetIp $hostIp -Port $port -Alias $appAlias -DisplayName $appName -GatewayHost $useGw -GatewayPort $gwPort
+    return [ordered]@{ FileName = $outName; Content = $text; Host = $(if ($useGw) { $useGw } else { $hostIp }); Port = $(if ($useGw) { $gwPort } else { $port }) }
 }
 
 function Get-RemoteAppDownloadIndex {
@@ -1736,6 +1814,7 @@ function Get-RemoteAppDownloadIndex {
         lanIp          = $(if ($cust.lanIp) { [string]$cust.lanIp } else { [string]$cust['lanIp'] })
         vpnIp          = $(if ($cust.vpnIp) { [string]$cust.vpnIp } else { [string]$cust['vpnIp'] })
         download       = '/download'
+        web            = '/web'
         files          = $items
     }
 }
@@ -1923,7 +2002,7 @@ function Test-ProbeApiAnonymousPath {
     $p = $Path.ToLowerInvariant().TrimEnd('/')
     if ([string]::IsNullOrWhiteSpace($p)) { $p = '/' }
     if ($p -eq '/' -or $p -eq '/health' -or $p -eq '/api/health' -or $p -eq '/probe/api/health') { return $true }
-    if ($p -eq '/download' -or $p -eq '/rdp' -or $p -eq '/api/portal' -or $p -eq '/api/apps' -or $p -eq '/app' -or $p -eq '/dashboard' -or $p -eq '/index.html' -or $p -eq '/api/icon') { return $true }
+    if ($p -eq '/download' -or $p -eq '/web' -or $p -eq '/rdp' -or $p -eq '/api/portal' -or $p -eq '/api/apps' -or $p -eq '/api/web' -or $p -eq '/app' -or $p -eq '/dashboard' -or $p -eq '/index.html' -or $p -eq '/api/icon' -or $p -eq '/gateway.cer') { return $true }
     if ($p.StartsWith('/rdp/')) { return $true }
     if ($p.StartsWith('/assets/')) { return $true }
     return $false
@@ -2115,6 +2194,30 @@ function Invoke-ProbeApiRequest {
             if ($dash) { return $dash }
             return New-ProbeApiHttpResponse -Body (Get-RemoteAppDownloadHtml) -ContentType 'text/html; charset=utf-8'
         }
+        '/web'                  {
+            $wcid = $null
+            $walias = $null
+            if ($query['customer']) { $wcid = [string]$query['customer'] }
+            if ($query['alias']) { $walias = [string]$query['alias'] }
+            return New-ProbeApiHttpResponse -Body (Get-WebRdpLaunchHtml -CustomerId $wcid -Alias $walias -Request $Request) -ContentType 'text/html; charset=utf-8' -Headers @{
+                'Cache-Control' = 'no-store'
+            }
+        }
+        '/gateway.cer'          {
+            $cer = Get-ExfinGatewayCerPem
+            if (-not $cer) {
+                return New-ProbeApiHttpResponse -Status 404 -Body @{ error = 'gateway_cert_missing' }
+            }
+            return New-ProbeApiHttpResponse -Body $cer -ContentType 'application/x-x509-ca-cert' -Headers @{
+                'Content-Disposition' = 'attachment; filename="EXFIN-RD-Gateway.cer"'
+                'Cache-Control' = 'no-store'
+            }
+        }
+        '/api/web'              {
+            $wcid = $null
+            if ($query['customer']) { $wcid = [string]$query['customer'] }
+            return New-ProbeApiHttpResponse -Body (Get-WebRdpStatus -CustomerId $wcid)
+        }
         '/app'                  {
             $dash = Get-DashboardStaticResponse -RequestPath '/app'
             if ($dash) { return $dash }
@@ -2170,6 +2273,10 @@ function Invoke-ProbeApiRequest {
 $script:ExfinAccessPath = Join-Path $PSScriptRoot 'ExfinAccess.ps1'
 if (Test-Path -LiteralPath $script:ExfinAccessPath) {
     . $script:ExfinAccessPath
+}
+$script:ExfinWebRdpPath = Join-Path $PSScriptRoot 'ExfinWebRdp.ps1'
+if (Test-Path -LiteralPath $script:ExfinWebRdpPath) {
+    . $script:ExfinWebRdpPath
 }
 
 # ---------------------------------------------------------------------------

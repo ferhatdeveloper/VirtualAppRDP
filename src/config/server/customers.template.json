@@ -9,7 +9,12 @@
       "lanIp": "",
       "vpnIp": "",
       "rdpPort": 3389,
-      "lanRdpPort": 3389
+      "lanRdpPort": 3389,
+      "connectMode": "direct",
+      "gatewayHost": "",
+      "gatewayPort": 443,
+      "webKind": "auto",
+      "webUrl": ""
     }
   ]
 }

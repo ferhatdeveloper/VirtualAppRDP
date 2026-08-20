@@ -80,8 +80,10 @@ export default function App() {
   const [portal, setPortal] = useState({ customers: [], webPort: 8001, listenRdpPort: 3389 })
   const [customerId, setCustomerId] = useState('default')
   const [form, setForm] = useState({
-    name: '', publicIp: '', lanIp: '', vpnIp: '', rdpPort: 3389, lanRdpPort: 3389
+    name: '', publicIp: '', lanIp: '', vpnIp: '', rdpPort: 3389, lanRdpPort: 3389,
+    connectMode: 'direct', gatewayHost: '', gatewayPort: 443, webKind: 'auto', webUrl: ''
   })
+  const [webInfo, setWebInfo] = useState(null)
   const [webPort, setWebPort] = useState(8001)
   const [token, setToken] = useState(sessionStorage.getItem('rdpvb_token') || '')
   const [status, setStatus] = useState('')
@@ -132,7 +134,12 @@ export default function App() {
       lanIp: c.lanIp || '',
       vpnIp: c.vpnIp || '',
       rdpPort: c.rdpPort || 3389,
-      lanRdpPort: c.lanRdpPort || 3389
+      lanRdpPort: c.lanRdpPort || 3389,
+      connectMode: c.connectMode || 'direct',
+      gatewayHost: c.gatewayHost || c.publicIp || '',
+      gatewayPort: c.gatewayPort || 443,
+      webKind: c.webKind || 'auto',
+      webUrl: c.webUrl || ''
     })
   }
 
@@ -176,7 +183,15 @@ export default function App() {
     loadTotp().catch(() => {})
   }, [loadApps, loadPortal])
 
+  const loadWeb = useCallback(async () => {
+    const q = '?customer=' + encodeURIComponent(customerId || 'default')
+    const res = await fetch('/api/web' + q)
+    const data = await readJson(res)
+    if (res.ok) setWebInfo(data)
+  }, [customerId])
+
   useEffect(() => { loadFiles().catch(() => {}) }, [loadFiles])
+  useEffect(() => { loadWeb().catch(() => {}) }, [loadWeb])
 
   const pickApp = (app) => {
     setSelectedAlias(app.alias)
@@ -298,7 +313,12 @@ export default function App() {
           lanIp: form.lanIp.trim(),
           vpnIp: form.vpnIp.trim(),
           rdpPort: parseInt(form.rdpPort, 10),
-          lanRdpPort: parseInt(form.lanRdpPort, 10)
+          lanRdpPort: parseInt(form.lanRdpPort, 10),
+          connectMode: form.connectMode || 'direct',
+          gatewayHost: (form.gatewayHost || '').trim(),
+          gatewayPort: parseInt(form.gatewayPort, 10) || 443,
+          webKind: form.webKind || 'auto',
+          webUrl: (form.webUrl || '').trim()
         }
       }
       const res = await fetch('/api/portal', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) })
@@ -307,6 +327,7 @@ export default function App() {
       setPortal(data)
       note('Musteri kaydedildi.', 'ok')
       await loadFiles()
+      await loadWeb()
     } catch (e) { note('Hata: ' + e, 'err') }
     finally { setBusy(false) }
   }
@@ -473,7 +494,7 @@ export default function App() {
           <span>Uygulama, ikon, dosya ve istemci izni</span>
         </div>
         <nav className="tabs">
-          {[['apps', 'Uygulamalar'], ['files', 'Dosyalar'], ['icons', 'Ikonlar'], ['clients', 'Istemciler'], ['security', 'Guvenlik']].map(([id, label]) => (
+          {[['apps', 'Uygulamalar'], ['web', 'Web RDP'], ['files', 'Dosyalar'], ['icons', 'Ikonlar'], ['clients', 'Istemciler'], ['security', 'Guvenlik']].map(([id, label]) => (
             <button key={id} type="button" className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{label}</button>
           ))}
         </nav>
@@ -536,12 +557,43 @@ export default function App() {
                   ))}
                 </ul>
                 <div className="actions">
+                  <a className="btn" href={'/web?customer=' + encodeURIComponent(customerId)} target="_blank" rel="noreferrer">Web giris sayfasi</a>
+                  <a className="btn" href={'/rdp/' + encodeURIComponent((selectedAlias || 'app').toLowerCase()) + '-gateway.rdp?customer=' + encodeURIComponent(customerId)}>Gateway .rdp</a>
                   <a className="btn" href={'/rdp/public.rdp?customer=' + encodeURIComponent(customerId)}>Public</a>
                   <a className="btn secondary" href={'/rdp/lan.rdp?customer=' + encodeURIComponent(customerId)}>LAN</a>
                   <a className="btn secondary" href={'/rdp/vpn.rdp?customer=' + encodeURIComponent(customerId)}>VPN</a>
                 </div>
               </div>
             </>
+          )}
+
+          {tab === 'web' && (
+            <div className="card">
+              <h3>Web RDP — tarayicidan giris</h3>
+              <p className="status">
+                Kullanicilar <a href={'/web?customer=' + encodeURIComponent(customerId)} target="_blank" rel="noreferrer">/web</a> sayfasini acar.
+                HTML5 icin RD Web Client veya Guacamole (8443) gerekir. Bu sunucuda Gateway servisi
+                {webInfo && webInfo.gatewayRunning ? ' calisiyor' : ' yok'}.
+              </p>
+              {webInfo && (
+                <ul className="files">
+                  <li>Algilanan: {webInfo.resolvedKind}</li>
+                  <li>Gateway: {webInfo.gatewayHost}:{webInfo.gatewayPort} {webInfo.gatewayRunning ? '(servis acik)' : '(servis kapali)'}</li>
+                  <li>RD Web HTML5: {webInfo.rdWebHtml5 ? 'var' : 'yok'}</li>
+                  <li>Guacamole 8443: {webInfo.guacamole ? 'acik' : 'kapali'}</li>
+                </ul>
+              )}
+              {webInfo && webInfo.hint && <p className="status">{webInfo.hint}</p>}
+              <div className="actions">
+                <a className="btn" href={'/web?customer=' + encodeURIComponent(customerId)} target="_blank" rel="noreferrer">Kullanici web girisi</a>
+                {webInfo && webInfo.launchPublic && (
+                  <a className="btn secondary" href={webInfo.launchPublic} target="_blank" rel="noreferrer">Public web URL</a>
+                )}
+                {webInfo && webInfo.launchLan && window.location.hostname !== webInfo.publicIp && (
+                  <a className="btn secondary" href={webInfo.launchLan} target="_blank" rel="noreferrer">LAN web URL</a>
+                )}
+              </div>
+            </div>
           )}
 
           {tab === 'files' && (
@@ -660,6 +712,25 @@ export default function App() {
               <div><label>WAN RDP portu</label><input type="number" value={form.rdpPort} onChange={(e) => setForm({ ...form, rdpPort: e.target.value })} /></div>
               <div><label>LAN/VPN RDP portu</label><input type="number" value={form.lanRdpPort} onChange={(e) => setForm({ ...form, lanRdpPort: e.target.value })} /></div>
             </div>
+            <label>Baglanti modu</label>
+            <select value={form.connectMode} onChange={(e) => setForm({ ...form, connectMode: e.target.value })}>
+              <option value="direct">Direct (WAN RDP portu)</option>
+              <option value="gateway">RD Gateway (TCP 443)</option>
+              <option value="web">Web RDP (tarayici)</option>
+            </select>
+            <div className="row">
+              <div><label>Gateway host</label><input value={form.gatewayHost} onChange={(e) => setForm({ ...form, gatewayHost: e.target.value })} placeholder="185.86.15.238" /></div>
+              <div><label>Gateway port</label><input type="number" value={form.gatewayPort} onChange={(e) => setForm({ ...form, gatewayPort: e.target.value })} /></div>
+            </div>
+            <label>Web RDP turu</label>
+            <select value={form.webKind} onChange={(e) => setForm({ ...form, webKind: e.target.value })}>
+              <option value="auto">Otomatik</option>
+              <option value="rdweb">RD Web</option>
+              <option value="guacamole">Guacamole (8443)</option>
+              <option value="custom">Ozel URL</option>
+            </select>
+            <label>Ozel web URL (opsiyonel)</label>
+            <input value={form.webUrl} onChange={(e) => setForm({ ...form, webUrl: e.target.value })} placeholder="https://..." />
             <label>Web portu</label>
             <input type="number" value={webPort} onChange={(e) => setWebPort(e.target.value)} />
             <label>Yonetici token</label>
