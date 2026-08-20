@@ -10,7 +10,7 @@ import Foundation
 //  HTTP istegi atar. JSON semasi mevcut PowerShell semasi ile aynidir
 //  (probe.json -> ProbeResult).
 //
-//  Standart URL formati: https://<server>:8443/probe/api/probe
+//  Standart URL formati: http://<server>:8444/probe/api/probe
 //  Auth: opsiyonel Bearer (client secret).
 // =====================================================================
 
@@ -38,7 +38,7 @@ public protocol ServerProbeQuerying {
 }
 
 extension ServerProbeQuerying {
-    public func probe(server: String, port: Int = 8443, path: String = "/probe/api/probe", token: String? = nil) async throws -> ProbeResult {
+    public func probe(server: String, port: Int = 8444, path: String = "/probe/api/probe", token: String? = nil) async throws -> ProbeResult {
         try await probe(server: server, port: port, path: path, token: token)
     }
 }
@@ -66,7 +66,7 @@ public final class ServerProbeService: ServerProbeQuerying {
 
     public func probe(
         server: String,
-        port: Int = 8443,
+        port: Int = 8444,
         path: String = "/probe/api/probe",
         token: String? = nil
     ) async throws -> ProbeResult {

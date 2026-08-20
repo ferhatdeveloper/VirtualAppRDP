@@ -7,6 +7,65 @@ Versiyonlama [Semantic Versioning](https://semver.org/) kurallarına uyar.
 
 ---
 
+## [Unreleased]
+
+### Eklenenler (Added)
+
+- **Android istemci** — `src/android/ExfinRemoteApp/` Kotlin / Jetpack Compose 4 adimlik sihirbaz. Probe API (8444), uygulama listesi, Public/LAN/VPN `.rdp` indirme, `POST /api/clients` cihaz kaydi, Microsoft Remote Desktop ile acma. Kilavuz: `docs/android-setup-guide.md`.
+- **Android imza / Play Store** — `keystore.properties` veya `EXFIN_KEYSTORE_*` ile `assembleRelease` / `bundleRelease`. `src/android/New-ReleaseKeystore.ps1` yerel upload JKS uretir (repoya yazılmaz).
+- **iOS istemci** — `src/ios/ExfinRemoteApp/` SwiftUI 4 adimlik sihirbaz (XcodeGen). Ayni Probe API; `.rdp` Paylas / Microsoft Remote Desktop. Kilavuz: `docs/ios-setup-guide.md`.
+
+## [1.1.5] - 2026-08-20
+
+### Eklenenler (Added)
+
+- **EXFIN RemoteAPP** urun adi (panel, kurucu, sihirbaz).
+- **Ikon paneli** — RemoteApp ikonu Open File ile .ico/.exe/.png secilir, TSAppAllowList `IconPath` guncellenir.
+- **Dosyalar sekmesi** — sunucudaki metinleri yayinlamadan gezme ve onizleme.
+- **Google Authenticator (TOTP)** — QR + 6 haneli kod ile panel girisi.
+- **Istemci izni** — Client kurulumu sunucuya kayit gonderir; admin Izin ver / Reddet. `requireApproval` acikken onaylanmamis istemci .rdp alamaz.
+
+## [1.1.4] - 2026-08-20
+
+### Eklenenler (Added)
+
+- **Caddy SSL (HTTPS 8445)** — Probe REST API önünde reverse proxy. Alan adı yoksa Caddy dahili CA (`tls internal`); `RDPVB_CADDY_DOMAIN` varsa Let's Encrypt (HTTP-01, TCP 80). 443 RD Gateway/IIS'e bırakılır. Sihirbazda ayrı onay kutusu.
+- **Degistirilebilir RDP portu** — `RDPVB_RDP_PORT`, sihirbaz alani veya `Set-RdpListenPort.ps1`. Uretilen `.rdp` dosyalari ve firewall bu portu kullanir.
+- **Musteri portali (TCP 8001)** — Her musterinin WAN RDP portu ayri kaydedilir; indirme sayfasindan degistirilir. Web `http://<ip>:8001/download`; 8001 doluysa Probe 8444 ayakta kalir.
+- **Ilk kurulum runtime** — `Install-ServerRuntime.ps1` LAN/WAN/VPN IP tespiti, `customers.json` / `client-endpoints.json` / `probe-api.json` (token yoksa uretir), firewall, Probe API ve Caddy. Mevcut ProgramData dosyalari silinmez.
+- **React dashboard** — `/download` uzerinde Open File (sunucu gezgini), yol yazma ve uygulama secimi. `POST /api/apps` TSAppAllowList yayini; `GET /api/browse` klasor listesi.
+
+### Degisenler (Changed)
+
+- Inno Setup `[Run]` artik yalniz Probe API degil, calisan mimarinin tamamini kurar (`Install-ServerRuntime.ps1`).
+- EXE icindeki sablonlar bu makinenin IP / token degerlerini tasimaz; kurulumda algilanir.
+
+---
+
+## [1.1.3] - 2026-08-20
+
+### Düzeltilenler (Fixed)
+
+- **Kurulum: `RdpVirtualBoxApp-Server-v1.1.2-0.bin is missing`** — `UseSetupLdr=no` kurucuyu `.exe` + `.bin` olarak ayırdı; tek EXE için 64-bit loader (`UseSetupLdr=x64`) geri alındı. `v1.1.2` tek başına çalışmaz.
+
+---
+
+## [1.1.2] - 2026-08-20
+
+### Düzeltilenler (Fixed)
+
+- **Kurulum (RDS): "Setup / The system cannot find the path specified"** — Inno Setup Loader kurucuyu `%TEMP%\is-xxxxx.tmp` altına açıp yeniden çalıştırıyordu. Windows Server RDP oturumunda TEMP `...\Temp\2` gibi oturum klasörüne yönlenince iç Setup.exe bulunamıyordu. Loader kapatıldı (`UseSetupLdr=no`); yükseltme diyaloğu kaldırıldı. `v1.1.0` / `v1.1.1` kullanmayın.
+
+---
+
+## [1.1.1] - 2026-08-20
+
+### Düzeltilenler (Fixed)
+
+- **Kurulum: "The system cannot find the path specified"** — 32-bit Inno Setup.exe `powershell.exe`'i PATH üzerinden arıyordu; Windows Server'da (özellikle WOW64) Setup bu hatayla düşüyordu. Artık tam yol `{sys}\WindowsPowerShell\v1.0\powershell.exe` kullanılıyor. `v1.1.0.exe` kullanmayın.
+
+---
+
 ## [1.1.0] - 2026-08-20
 
 ### Eklenenler (Added)
@@ -17,7 +76,7 @@ Versiyonlama [Semantic Versioning](https://semver.org/) kurallarına uyar.
 - **Microsoft Remote Desktop entegrasyonu** — `rdp://` URL semasi ile MS RDP.app'i tetikler; `.rdp` dosyasi `~/Documents/RdpVirtualBoxApp/` altina yazilir.
 - **SwiftUI wizard view'lari** — WizardView, Step1ServerInfo, Step2ProbeResults, Step3AppSelection, Step4Review.
 - **Localizable.strings** — Turkce (varsayilan) + Ingilizce fallback.
-- **Sunucu tarafi Probe REST API** — `src/powershell/server/ProbeApi.ps1`. macOS istemcisi WinRM yerine HTTPS/Bearer uzerinden sunucuyu tarar. JSON semasi mevcut ServerProbe.ps1 ile bire bir uyumlu.
+- **Sunucu tarafi Probe REST API host** — `Start-ProbeApiHost.ps1` TcpListener ile HTTP/1.1 dinler (port 8444). Endpointler: `/health`, `/probe/api/probe`, `/api/manifest`, `/api/apps`, `/api/status`. Bearer token + scheduled task + firewall kurali. Extra runtime (IIS/Kestrel) gerekmez.
 - **GitHub Actions `build-macos` job** — `macos-latest` runner'i uzerinde `swift build` + `swift test` + DMG olusturma. `rdp-virtual-box-app-macos` artifact'i olarak 30 gun saklanir.
 
 ### Degisenler (Changed)

@@ -1,0 +1,12 @@
+{
+  "note": "NAT: TCP/UDP RDP listen port, TCP 443, TCP 8444, TCP 8445, TCP 8001 -> LAN IP. Probe HTTP 8444, Caddy HTTPS 8445. Per-customer WAN RDP port is in customers.json.",
+  "app": "C:\\LOGO\\TIGER3ENT\\Tiger3Enterprise.exe",
+  "lan": "",
+  "public": "",
+  "vpn": "",
+  "client": "",
+  "probe": 8444,
+  "https": 443,
+  "rdpPort": 3389,
+  "probeHttps": 8445
+}

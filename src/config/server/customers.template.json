@@ -1,0 +1,15 @@
+{
+  "webPort": 8001,
+  "listenRdpPort": 3389,
+  "customers": [
+    {
+      "id": "default",
+      "name": "Varsayilan",
+      "publicIp": "",
+      "lanIp": "",
+      "vpnIp": "",
+      "rdpPort": 3389,
+      "lanRdpPort": 3389
+    }
+  ]
+}

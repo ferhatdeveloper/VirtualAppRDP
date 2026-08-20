@@ -1,0 +1,29 @@
+name: ExfinRemoteApp
+options:
+  bundleIdPrefix: com.exfin
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    MARKETING_VERSION: 1.1.5
+    CURRENT_PROJECT_VERSION: 115
+    SWIFT_VERSION: "5.9"
+targets:
+  ExfinRemoteApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: ExfinRemoteApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.exfin.remoteapp
+        PRODUCT_NAME: EXFIN RemoteAPP
+        INFOPLIST_FILE: ExfinRemoteApp/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        SUPPORTS_MACCATALYST: NO
+        IPHONEOS_DEPLOYMENT_TARGET: 16.0
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

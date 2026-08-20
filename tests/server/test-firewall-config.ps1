@@ -29,7 +29,7 @@ Describe 'FirewallConfig' {
 
     Context 'Set-RdpVirtualBoxAppFirewall' {
 
-        It 'should create the five default rules when none exist' {
+        It 'should create the eight default rules when none exist' {
             Mock -CommandName 'Get-NetFirewallRule' -MockWith { $null }
             $script:newCalls = New-Object System.Collections.Generic.List[object]
             Mock -CommandName 'New-NetFirewallRule' -MockWith {
@@ -42,13 +42,16 @@ Describe 'FirewallConfig' {
 
             $result = Set-RdpVirtualBoxAppFirewall -LogPath $script:fwLogPath -WhatIf:$false
 
-            $script:newCalls.Count | Should -Be 5
+            $script:newCalls.Count | Should -Be 8
             ($script:newCalls | ForEach-Object Port) | Should -Contain 3389
             ($script:newCalls | ForEach-Object Port) | Should -Contain 443
             ($script:newCalls | ForEach-Object Port) | Should -Contain 8443
+            ($script:newCalls | ForEach-Object Port) | Should -Contain 8444
+            ($script:newCalls | ForEach-Object Port) | Should -Contain 8001
+            ($script:newCalls | ForEach-Object Port) | Should -Contain 8445
             ($script:newCalls | ForEach-Object Port) | Should -Contain 5985
             ($script:newCalls | ForEach-Object Port) | Should -Contain 5986
-            $result.Created.Count   | Should -Be 5
+            $result.Created.Count   | Should -Be 8
             $result.Existing.Count  | Should -Be 0
         }
 
@@ -68,7 +71,7 @@ Describe 'FirewallConfig' {
             $result = Set-RdpVirtualBoxAppFirewall -LogPath $script:fwLogPath -WhatIf:$false
 
             $result.Existing.Count | Should -Be 1
-            $result.Created.Count  | Should -Be 4
+            $result.Created.Count  | Should -Be 7
         }
 
         It 'should enable all profiles when -EnableFirewall is supplied' {

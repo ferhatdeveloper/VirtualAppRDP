@@ -188,6 +188,46 @@ function Write-SetupLog {
     }
 }
 
+function Get-SetupProbeApiPort {
+    <#
+    .SYNOPSIS  Probe API port from wizard State, default 8444.
+    #>
+    [CmdletBinding()]
+    [OutputType([int])]
+    param([hashtable] $State)
+
+    $fallback = 8444
+    if (-not $State) { return $fallback }
+    try {
+        foreach ($key in @('ProbePort', 'probePort')) {
+            if ($State.ContainsKey($key) -and $null -ne $State[$key] -and [string]$State[$key] -ne '') {
+                $n = [int]$State[$key]
+                if ($n -ge 1 -and $n -le 65535) { return $n }
+            }
+        }
+        $probe = $null
+        if ($State.ContainsKey('Probe')) { $probe = $State['Probe'] }
+        if ($probe) {
+            foreach ($key in @('ProbePort', 'probePort')) {
+                $val = $null
+                if ($probe -is [System.Collections.IDictionary]) {
+                    if ($probe.Contains($key)) { $val = $probe[$key] }
+                } else {
+                    $prop = $probe.PSObject.Properties[$key]
+                    if ($prop) { $val = $prop.Value }
+                }
+                if ($null -ne $val -and [string]$val -ne '') {
+                    $n = [int]$val
+                    if ($n -ge 1 -and $n -le 65535) { return $n }
+                }
+            }
+        }
+    } catch {
+        Write-Verbose ("Probe port resolve skipped: {0}" -f $_.Exception.Message)
+    }
+    return $fallback
+}
+
 # ---------------------------------------------------------------------------
 # Validation helpers
 # ---------------------------------------------------------------------------
@@ -1265,6 +1305,7 @@ function Start-ClientInstall {
         }
 
         # 4) AppRegistry'ye uygulama kayıtları
+        $probePort = Get-SetupProbeApiPort -State $State
         if ($script:ClientModulesLoaded.AppRegistry -and $rdpApps.Count -gt 0) {
             $regPath = Get-AppRegistryPath
             if (-not (Test-Path -LiteralPath $regPath)) {
@@ -1274,9 +1315,37 @@ function Start-ClientInstall {
                 $app   = $selectedApps[$i]
                 $rdp   = if ($generatedRdp.Count -gt $i) { $generatedRdp[$i] } else { $null }
                 if (-not $rdp) { continue }
-                $null = Register-App -Id ([string]$app.id) -Name ([string]$app.name) -Server $State.Server.Ip -Port $State.Server.Port -RdpPath $rdp -RemoteAppAlias ([string]$app.alias) -CredentialMode $credMode
+                $null = Register-App -Id ([string]$app.id) -Name ([string]$app.name) -Server $State.Server.Ip -Port $State.Server.Port -RdpPath $rdp -RemoteAppAlias ([string]$app.alias) -CredentialMode $credMode -ProbePort $probePort
             }
             Write-SetupLog -Message "AppRegistry güncellendi."
+        }
+
+        # 4b) One summary POST after all apps so a single per-app failure does not drop the record.
+        try {
+            $mid = ''
+            try { $mid = [string](Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction Stop).MachineGuid } catch {}
+            $appsPayload = @()
+            foreach ($app in $selectedApps) {
+                $appsPayload += @{
+                    id    = [string]$app.id
+                    name  = [string]$app.name
+                    alias = [string]$app.alias
+                }
+            }
+            $uri = 'http://{0}:{1}/api/clients' -f $State.Server.Ip, $probePort
+            $payload = [ordered]@{
+                machineId = $mid
+                hostname  = $env:COMPUTERNAME
+                username  = $env:USERNAME
+                apps      = @($appsPayload)
+            } | ConvertTo-Json -Compress -Depth 4
+            Write-Verbose ("Istemci ozet kaydi POST {0}" -f $uri)
+            Write-SetupLog -Message ("Istemci ozet kaydi gonderiliyor: {0} (apps={1})" -f $uri, $appsPayload.Count)
+            Invoke-WebRequest -Uri $uri -Method POST -Body $payload -ContentType 'application/json; charset=utf-8' -UseBasicParsing -TimeoutSec 8 | Out-Null
+            Write-SetupLog -Message "Istemci ozet kaydi gonderildi."
+        } catch {
+            Write-Verbose ("Sunucu istemci ozet kaydi atlandi: {0}" -f $_.Exception.Message)
+            Write-SetupLog -Level Warn -Message ("Sunucu istemci ozet kaydi atlandi: {0}" -f $_.Exception.Message)
         }
 
         # 5) SelfTest (bağlantı doğrulama) - opsiyonel, modül yüklüyse çağrılır

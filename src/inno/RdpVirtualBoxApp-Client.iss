@@ -12,15 +12,15 @@
 ;  Output: build\output\RdpVirtualBoxApp-Client-v1.0.1.exe
 ; =====================================================================
 
-#define MyAppName            "Rdp Virtual Box App"
+#define MyAppName            "EXFIN RemoteAPP"
 #define MyAppShortName        "RdpVirtualBoxApp"
-#define MyAppVersion          "1.0.1"
-#define MyAppPublisher        "Rdp Virtual Box App"
+#define MyAppVersion          "1.1.5"
+#define MyAppPublisher        "EXFIN RemoteAPP"
 #define MyAppURL              "https://github.com/ferhatdeveloper/VirtualAppRDP"
 #define MyAppSupportURL       "https://github.com/ferhatdeveloper/VirtualAppRDP/issues"
 #define MyAppUpdatesURL       "https://github.com/ferhatdeveloper/VirtualAppRDP/releases"
 #define MyAppExeName          "SetupUI.ps1"
-#define MyAppCopyright        "Copyright (C) 2026 Rdp Virtual Box App"
+#define MyAppCopyright        "Copyright (C) 2026 EXFIN RemoteAPP"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -58,7 +58,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; Paths are relative to the repository root (this script lives in src\inno).
 SourceDir=..\..
 OutputDir=build\output
-OutputBaseFilename=RdpVirtualBoxApp-Client-v1.0.1
+OutputBaseFilename=EXFIN-RemoteAPP-Client-v1.1.5
 SetupIconFile=src\assets\icon.ico
 UninstallDisplayIcon={app}\assets\icon.ico
 UninstallDisplayName={#MyAppName}
@@ -69,7 +69,7 @@ SolidCompression=yes
 
 ; Optional licence / version metadata
 LicenseFile=LICENSE
-VersionInfoVersion=1.0.1.0
+VersionInfoVersion=1.1.5.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Client Setup
 VersionInfoProductName={#MyAppName} Client

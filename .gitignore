@@ -30,6 +30,12 @@ build/output/
 *.tar.gz
 *.whl
 *.jar
+!src/android/**/gradle-wrapper.jar
+*.apk
+*.aab
+*.ipa
+src/android/**/.gradle/
+src/android/**/local.properties
 
 # --- Inno Setup intermediates ---------------------------------------------
 Output/

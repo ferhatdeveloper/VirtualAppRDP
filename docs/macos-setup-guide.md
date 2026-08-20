@@ -83,9 +83,9 @@ Kullanici adi:    FIRMA\kullanici     (veya kullanici@firma.local)
 Parola:           ********
 ```
 
-"Sunucuyu Tara" butonuna tiklayip **Probe REST API** uzerinden sunucu taramasi yapilir. macOS istemcisi WinRM kullanmaz; bunun yerine `https://<server>:8443/probe/api/probe` adresine Bearer token ile istek atar. Sonuclar tablo halinde gosterilir.
+"Sunucuyu Tara" butonuna tiklayip **Probe REST API** uzerinden sunucu taramasi yapilir. macOS istemcisi WinRM kullanmaz; bunun yerine `http://<server>:8444/probe/api/probe` adresine Bearer token ile istek atar. Sonuclar tablo halinde gosterilir.
 
-> **Onemli:** Sunucu tarafinda `ProbeApi.ps1` kurulu ve aktif olmalidir (IT admin'den teyit edin).
+> **Onemli:** Sunucu tarafinda Probe REST API (port 8444) calisiyor olmalidir. IT admin `Start-ProbeApiHost.ps1 -Mode Install` ile kurar; token `%ProgramData%\RdpVirtualBoxApp\Config\probe-api.json` icindedir.
 
 ### 3.2 Server Probe Sonuclari
 
@@ -201,7 +201,7 @@ security delete-generic-password -s RdpVirtualBoxApp
 | "Microsoft Remote Desktop is not installed" | App Store'dan Microsoft Remote Desktop yukleyin |
 | "Failed to open rdp://..." | `~/Documents/RdpVirtualBoxApp/erp.rdp` dosyasina sag tiklayip "Open With > Microsoft Remote Desktop" secin |
 | Probe basarisiz (HTTP 401) | Sunucuda Bearer token gerekli; IT admin'den `RDPVB_PROBE_TOKEN` degerini isteyin |
-| Probe basarisiz (HTTP 404) | Sunucuda `ProbeApi.ps1` kurulu degil; IT admin ile iletisime gecin |
+| Probe basarisiz (HTTP 404) | Sunucuda Probe API (port 8444) calismiyor; `Start-ProbeApiHost.ps1 -Mode Install` |
 | Self-signed sertifika uyarisi | RD Web / Guacamole HTTPS baglantisinda sertifika uyarisi normal; "Visit this website" ile devam edin |
 | Keychain erisim izni soruyor | macOS sifrenizi girin veya Touch ID ile onaylayin |
 | DMG acilmiyor | `xattr -d com.apple.quarantine /Applications/Rdp\ Virtual\ Box\ App.app` komutunu calistirin |

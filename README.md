@@ -15,6 +15,9 @@
 - [Hızlı Başlangıç / Quick Start](#hızlı-başlangıç--quick-start)
   - [Server Kurulumu](#server-kurulumu)
   - [Client Kurulumu](#client-kurulumu)
+  - [macOS Client Kurulumu](#macos-client-kurulumu)
+  - [Android Client Kurulumu](#android-client-kurulumu)
+  - [iOS Client Kurulumu](#ios-client-kurulumu)
 - [Bağlantı Stratejileri](#bağlantı-stratejileri)
 - [Mimari](#mimari)
 - [Ekran Görüntüleri](#ekran-görüntüleri)
@@ -31,9 +34,11 @@
 
 | EXE / DMG | Hedef | Çalışma Yeri | Yaptıkları |
 |---|---|---|---|
-| `RdpVirtualBoxApp-Server-vX.X.X.exe` | IT Admin | Windows Server (elevated) | RDS rolleri, RemoteApp yayını, sertifika, lisans tespiti, Guacamole/Tailscale/Cloudflare fallback, Probe REST API |
+| `RdpVirtualBoxApp-Server-vX.X.X.exe` | IT Admin | Windows Server (elevated) | RDS rolleri, RemoteApp yayını, sertifika, lisans tespiti, Guacamole/Tailscale/Cloudflare fallback, Probe REST API (TCP 8444) |
 | `RdpVirtualBoxApp-Client-vX.X.X.exe` | Son kullanıcı | Windows 10/11 | Sunucu tespiti, uygulama seçimi, `.rdp` üretimi, Start Menu kısayolu, web kısayolu |
 | `RdpVirtualBoxApp-Client-macOS-vX.X.X.dmg` | Son kullanıcı | macOS 12+ | SwiftUI 4 adımlı sihirbaz, Keychain entegrasyonu, Microsoft RDP entegrasyonu, HTML5 launcher |
+| `EXFIN-RemoteAPP-Android` APK | Son kullanıcı | Android 8+ | Kotlin/Compose sihirbaz, Probe API, `.rdp` + Microsoft Remote Desktop |
+| `EXFIN-RemoteAPP` iOS | Son kullanıcı | iOS 16+ | SwiftUI sihirbaz, Probe API, `.rdp` + Microsoft Remote Desktop |
 
 Sıralama önemlidir: **Önce Server kurulur, sonra Client dağıtılır.**
 
@@ -50,6 +55,8 @@ Sıralama önemlidir: **Önce Server kurulur, sonra Client dağıtılır.**
 - **Otomatik log + rollback** — kurulum hata verirse kısmi kurulumları geri alır.
 - **CI/CD** — GitHub Actions ile `windows-latest` ve `macos-latest` runner'ları üzerinde otomatik derleme.
 - **macOS desteği** — SwiftUI tabanlı yerel istemci (DMG) + Web Modu (HTML5) her iki yol da kullanılabilir.
+- **Android desteği** — Kotlin / Jetpack Compose yerel istemci; Probe API + Microsoft Remote Desktop.
+- **iOS desteği** — SwiftUI yerel istemci; ayni Probe API + Microsoft Remote Desktop.
 
 ---
 
@@ -100,6 +107,28 @@ Daha fazla bilgi için: [docs/client-setup-guide.md](docs/client-setup-guide.md)
 ```
 
 Daha fazla bilgi için: [docs/macos-setup-guide.md](docs/macos-setup-guide.md)
+
+### Android Client Kurulumu
+
+```text
+1. Android Studio ile src/android/ExfinRemoteApp projesini acin (veya CI APK'sini indirin)
+2. APK'yi telefona kurun
+3. Play Store'dan Microsoft Remote Desktop yukleyin
+4. Uygulamada sunucu IP + 8444 ile tarayin, RemoteApp secip baglanin
+```
+
+Daha fazla bilgi için: [docs/android-setup-guide.md](docs/android-setup-guide.md)
+
+### iOS Client Kurulumu
+
+```text
+1. Mac'te brew install xcodegen
+2. src/ios/ExfinRemoteApp icinde bash generate-xcode.sh
+3. Xcode'da Team secip cihaza Run
+4. App Store'dan Microsoft Remote Desktop yukleyin
+```
+
+Daha fazla bilgi için: [docs/ios-setup-guide.md](docs/ios-setup-guide.md)
 
 ---
 
@@ -158,7 +187,9 @@ flowchart LR
 - [docs/server-requirements.md](docs/server-requirements.md) — Server tarafı gereksinimler
 - [docs/client-requirements.md](docs/client-requirements.md) — Client tarafı gereksinimler
 - [docs/server-setup-guide.md](docs/server-setup-guide.md) — IT Admin için adım adım kurulum
-- [docs/client-setup-guide.md](docs/client-setup-guide.md) — Son kullanıcı için kurulum
+- [docs/macos-setup-guide.md](docs/macos-setup-guide.md) — macOS Native Client
+- [docs/android-setup-guide.md](docs/android-setup-guide.md) — Android Native Client
+- [docs/ios-setup-guide.md](docs/ios-setup-guide.md) — iOS Native Client
 - [docs/licensing-and-rdweb.md](docs/licensing-and-rdweb.md) — RD Web lisansı ve Guacamole karşılaştırması
 - [docs/troubleshooting.md](docs/troubleshooting.md) — Yaygın hatalar ve çözümler
 

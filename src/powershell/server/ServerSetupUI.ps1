@@ -56,10 +56,22 @@ $script:ServerModuleNames = @(
     'GuacamoleInstaller.ps1',
     'TailscaleInstaller.ps1',
     'CloudflareTunnelInstaller.ps1',
-    'AppScanner.ps1'
+    'AppScanner.ps1',
+    'ProbeApi.ps1'
 )
+function Resolve-ServerModulePath {
+    param([Parameter(Mandatory)][string]$Name)
+    $candidates = @(
+        (Join-Path $PSScriptRoot $Name)
+        (Join-Path $PSScriptRoot "PowerShell\$Name")
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path -LiteralPath $c) { return $c }
+    }
+    return $candidates[0]
+}
 foreach ($moduleName in $script:ServerModuleNames) {
-    $modulePath = Join-Path $PSScriptRoot $moduleName
+    $modulePath = Resolve-ServerModulePath -Name $moduleName
     if (-not (Test-Path -LiteralPath $modulePath)) {
         Write-SetupLog "Sunucu modulu bulunamadi (atlandi): $modulePath" -Level WARN
         $script:ServerModules[$moduleName] = $false
@@ -190,7 +202,10 @@ $script:WizardData = [ordered]@{
     InstallGuacamole = $false
     InstallTailscale = $false
     InstallCloudflare= $false
+    InstallProbeApi  = $true
+    InstallCaddySsl  = $true
     PublishApps      = $true
+    RdpPort          = 3389
     RdWebLicenseOk   = $false
     RdWebGraceDays   = 0
     ConnectionStrategies = @()          # Direct, Gateway, Guacamole, Tailscale, Cloudflare, Hybrid
@@ -232,7 +247,7 @@ function Get-ServerNetworkInfo {
 # 5. Main wizard form + 7 step panels
 # -----------------------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
-$form.Text            = 'Rdp Virtual Box App - Server Kurulumu'
+$form.Text            = 'EXFIN RemoteAPP - Server Kurulumu'
 $form.Size            = New-Object System.Drawing.Size(900, 640)
 $form.StartPosition   = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
@@ -249,7 +264,7 @@ $headerPanel.BackColor = $script:ThemeColor
 $form.Controls.Add($headerPanel)
 
 $lblTitle = New-Object System.Windows.Forms.Label
-$lblTitle.Text      = 'Rdp Virtual Box App'
+$lblTitle.Text      = 'EXFIN RemoteAPP'
 $lblTitle.Font      = New-Object System.Drawing.Font('Segoe UI', 16, [System.Drawing.FontStyle]::Bold)
 $lblTitle.ForeColor = [System.Drawing.Color]::White
 $lblTitle.AutoSize  = $true
@@ -330,7 +345,7 @@ Set-Alias -Name Switch-Step -Value Set-Step -Scope Global -Force
 $p1 = New-StepPanel 'Step1'
 
 $lbl1 = New-Object System.Windows.Forms.Label
-$lbl1.Text = "Rdp Virtual Box App - Server Kurulumu`n'a Hosgeldiniz"
+$lbl1.Text = "EXFIN RemoteAPP - Server Kurulumu`n'a Hosgeldiniz"
 $lbl1.Font = New-Object System.Drawing.Font('Segoe UI', 14, [System.Drawing.FontStyle]::Bold)
 $lbl1.Location = New-Object System.Drawing.Point(20, 20)
 $lbl1.AutoSize = $true
@@ -419,19 +434,34 @@ $rbCa.Location = New-Object System.Drawing.Point(15, 45)
 $rbCa.Size = New-Object System.Drawing.Size(400, 22)
 $gbCert.Controls.Add($rbCa)
 
+$lblRdpPort = New-Object System.Windows.Forms.Label
+$lblRdpPort.Text = 'RDP TCP port'
+$lblRdpPort.Location = New-Object System.Drawing.Point(430, 22)
+$lblRdpPort.Size = New-Object System.Drawing.Size(120, 22)
+$gbCert.Controls.Add($lblRdpPort)
+$numRdpPort = New-Object System.Windows.Forms.NumericUpDown
+$numRdpPort.Minimum = 1
+$numRdpPort.Maximum = 65535
+$numRdpPort.Value = 3389
+$numRdpPort.Location = New-Object System.Drawing.Point(560, 20)
+$numRdpPort.Size = New-Object System.Drawing.Size(90, 24)
+$gbCert.Controls.Add($numRdpPort)
+
 $gbOther = New-Object System.Windows.Forms.GroupBox
 $gbOther.Text = 'Diger Bilesenler'
-$gbOther.Location = New-Object System.Drawing.Point(20, 215)
-$gbOther.Size = New-Object System.Drawing.Size(840, 230)
+$gbOther.Location = New-Object System.Drawing.Point(20, 200)
+$gbOther.Size = New-Object System.Drawing.Size(840, 265)
 $gbOther.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
 $p2.Controls.Add($gbOther)
 
-$chkFw = New-Object System.Windows.Forms.CheckBox; $chkFw.Text = "Firewall Kurallari (3389, 443, 8443)"; $chkFw.Checked = $true;  $chkFw.Location = New-Object System.Drawing.Point(15, 25);  $chkFw.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkFw)
-$chkGw = New-Object System.Windows.Forms.CheckBox; $chkGw.Text = "RD Gateway";                                  $chkGw.Checked = $true;  $chkGw.Location = New-Object System.Drawing.Point(15, 50);  $chkGw.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkGw)
-$chkGu = New-Object System.Windows.Forms.CheckBox; $chkGu.Text = "Apache Guacamole (HTML5 fallback)";           $chkGu.Checked = $false; $chkGu.Location = New-Object System.Drawing.Point(15, 75);  $chkGu.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkGu)
-$chkTs = New-Object System.Windows.Forms.CheckBox; $chkTs.Text = "Tailscale (mesh VPN)";                        $chkTs.Checked = $false; $chkTs.Location = New-Object System.Drawing.Point(15, 100); $chkTs.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkTs)
-$chkCf = New-Object System.Windows.Forms.CheckBox; $chkCf.Text = "Cloudflare Tunnel";                           $chkCf.Checked = $false; $chkCf.Location = New-Object System.Drawing.Point(15, 125); $chkCf.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkCf)
-$chkAp = New-Object System.Windows.Forms.CheckBox; $chkAp.Text = "App Kutuphanesi (RemoteApp yayinlama)";        $chkAp.Checked = $true;  $chkAp.Location = New-Object System.Drawing.Point(15, 150); $chkAp.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkAp)
+$chkFw = New-Object System.Windows.Forms.CheckBox; $chkFw.Text = "Firewall Kurallari (3389, 443, 8443, 8444, 8445)"; $chkFw.Checked = $true;  $chkFw.Location = New-Object System.Drawing.Point(15, 22);  $chkFw.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkFw)
+$chkGw = New-Object System.Windows.Forms.CheckBox; $chkGw.Text = "RD Gateway";                                  $chkGw.Checked = $true;  $chkGw.Location = New-Object System.Drawing.Point(15, 46);  $chkGw.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkGw)
+$chkGu = New-Object System.Windows.Forms.CheckBox; $chkGu.Text = "Apache Guacamole (HTML5 fallback)";           $chkGu.Checked = $false; $chkGu.Location = New-Object System.Drawing.Point(15, 70);  $chkGu.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkGu)
+$chkTs = New-Object System.Windows.Forms.CheckBox; $chkTs.Text = "Tailscale (mesh VPN)";                        $chkTs.Checked = $false; $chkTs.Location = New-Object System.Drawing.Point(15, 94);  $chkTs.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkTs)
+$chkCf = New-Object System.Windows.Forms.CheckBox; $chkCf.Text = "Cloudflare Tunnel";                           $chkCf.Checked = $false; $chkCf.Location = New-Object System.Drawing.Point(15, 118); $chkCf.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkCf)
+$chkAp = New-Object System.Windows.Forms.CheckBox; $chkAp.Text = "App Kutuphanesi (RemoteApp yayinlama)";        $chkAp.Checked = $true;  $chkAp.Location = New-Object System.Drawing.Point(15, 142); $chkAp.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkAp)
+$chkPa = New-Object System.Windows.Forms.CheckBox; $chkPa.Text = "Probe REST API (port 8444, macOS / HTTP istemcileri)"; $chkPa.Checked = $true; $chkPa.Location = New-Object System.Drawing.Point(15, 166); $chkPa.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkPa)
+$chkCy = New-Object System.Windows.Forms.CheckBox; $chkCy.Text = "Caddy SSL (HTTPS 8445, Probe API reverse proxy)"; $chkCy.Checked = $true; $chkCy.Location = New-Object System.Drawing.Point(15, 190); $chkCy.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkCy)
 
 # Checkbox/radio state'leri Next handler'inda senkron olarak WizardData'ya yazilir
 # (parser-friendly: event handler baglama yerine snapshot okuma).
@@ -445,6 +475,9 @@ function Update-WizardDataFromStep2 {
     $script:WizardData.InstallTailscale  = [bool] $chkTs.Checked
     $script:WizardData.InstallCloudflare = [bool] $chkCf.Checked
     $script:WizardData.PublishApps       = [bool] $chkAp.Checked
+    $script:WizardData.InstallProbeApi   = [bool] $chkPa.Checked
+    $script:WizardData.InstallCaddySsl   = [bool] $chkCy.Checked
+    $script:WizardData.RdpPort           = [int] $numRdpPort.Value
     if ($rbSelf.Checked) {
         $script:WizardData.CertMode = 'SelfSigned'
     } elseif ($rbCa.Checked) {
@@ -565,8 +598,8 @@ $lbl4b.Size = New-Object System.Drawing.Size(820, 22)
 $p4.Controls.Add($lbl4b)
 
 $strategies = @(
-    @{ Name='Direct';      Text='Direct RDP (TCP 3389)';                    Description='LAN icin dogrudan RDP' },
-    @{ Name='Gateway';     Text='RD Gateway (TCP 443)';                    Description='HTTPS uzerinden tunelleme' },
+    @{ Name='Direct';      Text='Direct RDP (degistirilebilir TCP port)';   Description='LAN ve public IP; port sihirbazda / RDPVB_RDP_PORT ile degisir' },
+    @{ Name='Gateway';     Text='RD Gateway (TCP 443)';                    Description='Dis IP / HTTPS uzerinden tunelleme (NAT)' },
     @{ Name='Guacamole';   Text='Apache Guacamole (TCP 8443)';             Description='HTML5 erisim (lisans gerektirmez)' },
     @{ Name='Tailscale';   Text='Tailscale (mesh VPN)';                    Description='Sifir konfigürasyon, NAT arkasi' },
     @{ Name='Cloudflare';  Text='Cloudflare Tunnel';                       Description='Disariya port acmadan yayin' },
@@ -705,7 +738,8 @@ function Update-ReviewSummary {
     if ($script:WizardData.RdWebLicenseOk) {
         [void]$sb.AppendLine("  RD Web Lisansi : MEVCUT")
     } else {
-        [void]$sb.AppendLine("  RD Web Lisansi : YOK (Guacamole fallback $($script:WizardData.InstallGuacamole ? 'etkin' : 'devre disi'))")
+        $guacFb = if ($script:WizardData.InstallGuacamole) { 'etkin' } else { 'devre disi' }
+        [void]$sb.AppendLine("  RD Web Lisansi : YOK (Guacamole fallback $guacFb)")
     }
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("==== Bilesenler ====")
@@ -717,6 +751,9 @@ function Update-ReviewSummary {
     [void]$sb.AppendLine("  Tailscale     : $($script:WizardData.InstallTailscale)")
     [void]$sb.AppendLine("  Cloudflare    : $($script:WizardData.InstallCloudflare)")
     [void]$sb.AppendLine("  RemoteApp     : $($script:WizardData.PublishApps)")
+    [void]$sb.AppendLine("  Probe REST API: $($script:WizardData.InstallProbeApi)")
+    [void]$sb.AppendLine("  Caddy SSL     : $($script:WizardData.InstallCaddySsl)")
+    [void]$sb.AppendLine("  RDP port      : $($script:WizardData.RdpPort)")
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("==== Baglanti Stratejileri ====")
     foreach ($s in $script:WizardData.ConnectionStrategies) { [void]$sb.AppendLine("  - $s") }
@@ -840,10 +877,13 @@ function New-InstallActions {
         [void]$actions.Add(@{ Name='Sertifika hazirlaniyor'; Script='CertificateManager.ps1'; Args=$script:WizardData.CertMode })
     }
     if ($script:WizardData.ConfigureFirewall) { [void]$actions.Add(@{ Name='Firewall kurallari aciliyor'; Script='FirewallConfig.ps1' }) }
+    if ($script:WizardData.RdpPort)           { [void]$actions.Add(@{ Name=("RDP portu ayarlaniyor (TCP {0})" -f $script:WizardData.RdpPort); Script='Set-RdpListenPort.ps1'; Args=$script:WizardData.RdpPort }) }
     if ($script:WizardData.InstallGateway)    { [void]$actions.Add(@{ Name='RD Gateway kuruluyor'; Script='RDGatewayInstaller.ps1' }) }
     if ($script:WizardData.InstallGuacamole) { [void]$actions.Add(@{ Name='Apache Guacamole kuruluyor (uzun surer)'; Script='GuacamoleInstaller.ps1' }) }
     if ($script:WizardData.InstallTailscale) { [void]$actions.Add(@{ Name='Tailscale kuruluyor'; Script='TailscaleInstaller.ps1' }) }
     if ($script:WizardData.InstallCloudflare){ [void]$actions.Add(@{ Name='Cloudflare Tunnel kuruluyor'; Script='CloudflareTunnelInstaller.ps1' }) }
+    if ($script:WizardData.InstallProbeApi)   { [void]$actions.Add(@{ Name='Probe REST API kuruluyor (8444 + web portali)'; Script='Install-ProbeApiHost.ps1' }) }
+    if ($script:WizardData.InstallCaddySsl)   { [void]$actions.Add(@{ Name='Caddy SSL kuruluyor (HTTPS 8445)'; Script='Install-CaddySsl.ps1' }) }
     if ($script:WizardData.PublishApps -and $script:WizardData.SelectedApps.Count -gt 0) {
         [void]$actions.Add(@{ Name='RemoteApp koleksiyonu yayinlaniyor'; Script='RemoteAppPublisher.ps1' })
     }
@@ -872,7 +912,7 @@ function Start-InstallationWorker {
         $txtLog.AppendText(("[$($i+1)/$($actions.Count)] {0}`n" -f $a.Name))
         $txtLog.ScrollToCaret()
         try {
-            $scriptPath = Join-Path $PSScriptRoot $a.Script
+            $scriptPath = Resolve-ServerModulePath -Name $a.Script
             if (Test-Path $scriptPath) {
                 & $scriptPath @($a.Args) 2>&1 | ForEach-Object { $txtLog.AppendText("  $_`n"); $txtLog.ScrollToCaret() }
             } else {

@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "port": 8444,
+  "bind": "0.0.0.0",
+  "auth": "bearer",
+  "token": "",
+  "listenHttps": false,
+  "rdpPort": 3389,
+  "httpsPort": 8445,
+  "webPort": 8001
+}

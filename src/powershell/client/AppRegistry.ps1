@@ -187,7 +187,8 @@ function Register-App {
         [ValidateSet('Ask','Save','Embed')]
         [string] $CredentialMode = 'Ask',
         [string] $Category = 'custom',
-        [string] $IconPath
+        [string] $IconPath,
+        [int]    $ProbePort = 8444
     )
 
     try {
@@ -231,10 +232,28 @@ function Register-App {
             $shortcut.WorkingDirectory = (Split-Path -Parent $RdpPath)
             $shortcut.WindowStyle  = 3
             $shortcut.IconLocation = if ($IconPath) { "$IconPath,0" } else { "%SystemRoot%\system32\mstsc.exe,0" }
-            $shortcut.Description  = "Rdp Virtual Box App - $Name"
+            $shortcut.Description  = "EXFIN RemoteAPP - $Name"
             $shortcut.Save()
 
             Write-Verbose ("Registered app '{0}' -> {1}" -f $Id, $shortcutPath)
+            # Best-effort per-app POST. A later batch POST in SetupUI covers the full set.
+            try {
+                $mid = ''
+                try { $mid = [string](Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' -Name MachineGuid -ErrorAction Stop).MachineGuid } catch {}
+                $apiPort = 8444
+                if ($ProbePort -ge 1 -and $ProbePort -le 65535) { $apiPort = $ProbePort }
+                $uri = 'http://{0}:{1}/api/clients' -f $Server, $apiPort
+                $payload = [ordered]@{
+                    machineId = $mid
+                    hostname  = $env:COMPUTERNAME
+                    username  = $env:USERNAME
+                    apps      = @(@{ id = $Id; name = $Name; alias = $RemoteAppAlias })
+                } | ConvertTo-Json -Compress -Depth 4
+                Write-Verbose ("Istemci kaydi POST {0}" -f $uri)
+                Invoke-WebRequest -Uri $uri -Method POST -Body $payload -ContentType 'application/json; charset=utf-8' -UseBasicParsing -TimeoutSec 8 | Out-Null
+            } catch {
+                Write-Verbose ("Sunucu istemci kaydi atlandi: {0}" -f $_.Exception.Message)
+            }
             return $entryObj
         }
     } catch {

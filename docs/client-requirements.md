@@ -58,6 +58,25 @@ Modern tarayıcı üzerinden RD Web Access veya Guacamole'a bağlanır. Kurulum 
 | **Microsoft Remote Desktop** | App Store → "Microsoft Remote Desktop" |
 | **Xcode Command Line Tools** | `xcode-select --install` (yalnızca DMG build için; son kullanıcı gerektirmez) |
 
+### Android
+
+**Resmi olarak desteklenir** (kaynak: `src/android/ExfinRemoteApp/`). İki seçenek:
+
+| Yöntem | Uygulama | Bağlantı tipi |
+|---|---|---|
+| **Native Client** | EXFIN RemoteAPP APK | Probe API + Microsoft Remote Desktop ile `.rdp` |
+| **Web Modu** | Chrome / Edge | `http://<sunucu>:8444/download` paneli veya HTML5 |
+
+| Android sürümü | Minimum API | Önerilen |
+|---|---|---|
+| **Android 8.0+** | 26 | 12+ |
+
+Play Store'dan **Microsoft Remote Desktop** (`com.microsoft.rdc.androidx`) zorunludur. Ayrıntı: [android-setup-guide.md](android-setup-guide.md).
+
+### iOS / iPadOS
+
+**Resmi olarak desteklenir** (kaynak: `src/ios/ExfinRemoteApp/`). Xcode 15+ ve iOS 16+ gerekir. App Store'dan **Microsoft Remote Desktop** zorunludur. Ayrıntı: [ios-setup-guide.md](ios-setup-guide.md).
+
 ### Linux
 
 **Resmi olarak desteklenmiyor.** Ancak:
@@ -72,6 +91,8 @@ Modern tarayıcı üzerinden RD Web Access veya Guacamole'a bağlanır. Kurulum 
 |---|---|---|
 | **mstsc.exe** | `%SystemRoot%\System32\mstsc.exe` | Windows ile birlikte gelir; yeterli. |
 | **Remote Desktop App** | Microsoft Store | Modern UI, çoklu bağlantı; önerilen. |
+| **Microsoft Remote Desktop (Android)** | Play Store `com.microsoft.rdc.androidx` | Android native client `.rdp` dosyasını bununla açar. |
+| **Microsoft Remote Desktop (iOS)** | App Store | iOS native client `.rdp` paylaşımı / açma. |
 | **Remote Desktop Manager** | Üçüncü parti | Gelişmiş yönetim için. |
 
 ### mstsc.exe Sürüm Gereksinimi

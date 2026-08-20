@@ -199,11 +199,26 @@ Sihirbaz otomatik olarak üretir. RDP-Tcp dinleyicisine bağlanır. Tarayıcı u
 4. Sertifika thumbprint'i `Cert:\LocalMachine\My`'e import edilir.
 5. RDP-Tcp bağlantısına atanır (`wmic Win32_TSGeneralSetting`).
 
-### Let's Encrypt (ücretsiz, public)
+### Caddy HTTPS (Probe API, önerilen)
+
+Probe REST API (8444) düz HTTP dinler. Caddy **8445** üzerinde TLS sonlandırır ve `127.0.0.1:8444`'e proxy eder. **443 RD Gateway / IIS'e aittir; Caddy 443 kullanmaz.**
+
+```powershell
+# Yonetici PowerShell
+& "C:\Program Files\RdpVirtualBoxApp\PowerShell\Install-CaddySsl.ps1"
+```
+
+- **Alan adı yok:** Caddy dahili CA (`tls internal`). Sunucu `LocalMachine\Root` deposuna eklenir. İstemcilerde tarayıcı uyarısı olabilir.
+- **Let's Encrypt:** ortam değişkeni `RDPVB_CADDY_DOMAIN` (ve isteğe bağlı `RDPVB_CADDY_EMAIL`) ayarlayıp script'i yeniden çalıştırın. ACME HTTP-01 için modemde **TCP 80 → 192.168.5.100** ve **TCP 8445** yönlendirmesi gerekir.
+- Doğrulama: `https://127.0.0.1:8445/health`
+
+### Let's Encrypt (RD Gateway / RDP sertifikası)
+
+RDP-Tcp ve RD Web için `.pfx` gerekiyorsa:
 
 - `win-acme` (eski adıyla `letsencrypt-win-simple`) kullanın.
 - ACME challenge için 80 port'u kısa süreliğine açın.
-- Üretilen `.pfx`'i sihirbaza verin.
+- Üretilen `.pfx`'i sihirbazda **CA-signed Sertifika** olarak verin.
 
 ---
 
@@ -238,6 +253,10 @@ New-NetFirewallRule -DisplayName "RD Web 443" -Direction Inbound -LocalPort 443 
 
 # Guacamole
 New-NetFirewallRule -DisplayName "Guacamole 8443" -Direction Inbound -LocalPort 8443 -Protocol TCP -Action Allow
+
+# Probe REST API (HTTP) + Caddy TLS
+New-NetFirewallRule -DisplayName "Probe API 8444" -Direction Inbound -LocalPort 8444 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "Caddy HTTPS 8445" -Direction Inbound -LocalPort 8445 -Protocol TCP -Action Allow
 
 # WinRM (Client ServerProbe için)
 New-NetFirewallRule -DisplayName "WinRM 5985" -Direction Inbound -LocalPort 5985 -Protocol TCP -Action Allow
@@ -300,9 +319,40 @@ Invoke-WebRequest -Uri "https://localhost/RDWeb/webclient" -UseBasicParsing -Ski
 
 # 6. Guacamole çalışıyor mu?
 Invoke-WebRequest -Uri "https://localhost:8443/guacamole" -UseBasicParsing -SkipCertificateCheck
+
+# 7. Probe REST API çalışıyor mu?
+Invoke-RestMethod -Uri "http://localhost:8444/health"
+# Token: %ProgramData%\RdpVirtualBoxApp\Config\probe-api.json
+$cfg = Get-Content "$env:ProgramData\RdpVirtualBoxApp\Config\probe-api.json" -Raw | ConvertFrom-Json
+Invoke-RestMethod -Uri "http://localhost:8444/probe/api/probe" -Headers @{ Authorization = "Bearer $($cfg.token)" }
 ```
 
 Tüm komutlar başarılıysa server hazırdır. **Client Setup EXE'sini kullanıcılara dağıtabilirsiniz.**
+
+---
+
+## Probe REST API
+
+macOS ve HTTP istemcileri WinRM kullanamaz. Server setup, **TCP 8444** üzerinde Probe REST API host'unu scheduled task olarak kurar:
+
+```powershell
+# Elle kur / baslat
+powershell -ExecutionPolicy Bypass -File .\src\powershell\server\Install-ProbeApiHost.ps1
+
+# Durum
+powershell -ExecutionPolicy Bypass -File .\src\powershell\server\Start-ProbeApiHost.ps1 -Mode Status
+```
+
+| Method | Yol | Auth | Aciklama |
+|---|---|---|---|
+| GET | `/health` | Hayir | Canlilik |
+| GET | `/probe/api/probe` | Bearer | Tam sunucu taramasi (Swift semasi) |
+| GET | `/api/manifest` | Bearer | `server-manifest.json` |
+| GET | `/api/apps` | Bearer | RemoteApp listesi |
+| GET | `/api/status` | Bearer | Ozet durum |
+| GET | `/` | Hayir | Endpoint katalogu |
+
+Token dosyasi: `%ProgramData%\RdpVirtualBoxApp\Config\probe-api.json`
 
 ---
 

@@ -7,6 +7,9 @@
       * RDP (TCP 3389)
       * RD Web Access / RD Gateway (TCP 443)
       * Apache Guacamole (TCP 8443)
+      * Probe REST API (TCP 8444)
+      * Customer download portal (TCP 8001)
+      * Caddy HTTPS reverse proxy (TCP 8445)
       * WinRM HTTP (TCP 5985)
       * WinRM HTTPS (TCP 5986)
 
@@ -44,7 +47,10 @@ param(
     [string[]]$AllowedRemoteAddresses,
 
     [Parameter()]
-    [string]$LogPath
+    [string]$LogPath,
+
+    [ValidateRange(1, 65535)]
+    [int]$RdpPort = 3389
 )
 
 # ---------------------------------------------------------------------------
@@ -56,6 +62,9 @@ $script:DefaultRules = @(
     @{ DisplayName = "$script:RulePrefix - RDP 3389";            Port = 3389; Description = 'RDP direct connection' },
     @{ DisplayName = "$script:RulePrefix - HTTPS 443";           Port = 443;  Description = 'RD Web Access / RD Gateway HTTPS' },
     @{ DisplayName = "$script:RulePrefix - Guacamole 8443";      Port = 8443; Description = 'Apache Guacamole HTML5 gateway' },
+    @{ DisplayName = "$script:RulePrefix - Probe API 8444";      Port = 8444; Description = 'Probe REST API (macOS / HTTP clients)' },
+    @{ DisplayName = "$script:RulePrefix - Download portal 8001"; Port = 8001; Description = 'RemoteApp download / customer portal HTTP' },
+    @{ DisplayName = "$script:RulePrefix - Caddy HTTPS 8445";    Port = 8445; Description = 'Caddy TLS reverse proxy for Probe API' },
     @{ DisplayName = "$script:RulePrefix - WinRM 5985";          Port = 5985; Description = 'WinRM HTTP (ServerProbe)' },
     @{ DisplayName = "$script:RulePrefix - WinRM 5986";          Port = 5986; Description = 'WinRM HTTPS (ServerProbe)' }
 )
@@ -116,7 +125,9 @@ function Set-RdpVirtualBoxAppFirewall {
         [string[]]$AllowedRemoteAddresses,
 
         [Parameter()]
-        [string]$LogPath
+        [string]$LogPath,
+
+        [int]$RdpPort = 3389
     )
 
     if (-not $LogPath) {
@@ -138,8 +149,12 @@ function Set-RdpVirtualBoxAppFirewall {
         $existing = New-Object System.Collections.Generic.List[object]
 
         foreach ($rule in $script:DefaultRules) {
-            $name = $rule.DisplayName
-            $port = $rule.Port
+            $port = [int]$rule.Port
+            $name = [string]$rule.DisplayName
+            if ($port -eq 3389) {
+                $port = [int]$RdpPort
+                $name = "$script:RulePrefix - RDP $RdpPort"
+            }
 
             if (Test-RdpVirtualBoxAppRule -DisplayName $name) {
                 Write-FirewallLogEntry -Level Debug -Message "Rule '$name' already exists, skipping creation."
@@ -172,6 +187,11 @@ function Set-RdpVirtualBoxAppFirewall {
                 Write-FirewallLogEntry -Message "Created firewall rule: $name (TCP/$port)"
             }
         }
+
+        foreach ($grp in @('Remote Desktop', 'Remote Desktop Services', 'Remote Desktop Gateway Server Transport', 'Remote Desktop Gateway Server Farm')) {
+            Get-NetFirewallRule -DisplayGroup $grp -ErrorAction SilentlyContinue | Enable-NetFirewallRule -ErrorAction SilentlyContinue
+        }
+        Write-FirewallLogEntry -Message 'Enabled built-in Remote Desktop / Gateway firewall groups (all profiles).'
 
         return [PSCustomObject]@{
             Created   = $created.ToArray()
@@ -276,10 +296,12 @@ function Get-RdpVirtualBoxAppFirewallStatus {
     }
 }
 
-Export-ModuleMember -Function @(
-    'Set-RdpVirtualBoxAppFirewall',
-    'Enable-RdpVirtualBoxAppRule',
-    'Disable-RdpVirtualBoxAppRule',
-    'Remove-RdpVirtualBoxAppRule',
-    'Get-RdpVirtualBoxAppFirewallStatus'
-)
+if ($MyInvocation.MyCommand.Module) {
+    Export-ModuleMember -Function @(
+        'Set-RdpVirtualBoxAppFirewall',
+        'Enable-RdpVirtualBoxAppRule',
+        'Disable-RdpVirtualBoxAppRule',
+        'Remove-RdpVirtualBoxAppRule',
+        'Get-RdpVirtualBoxAppFirewallStatus'
+    )
+}

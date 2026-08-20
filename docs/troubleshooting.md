@@ -107,7 +107,16 @@ Bu belge, **Rdp Virtual Box App** kullanırken karşılaşılabilecek yaygın ha
 
 ### Kalıcı Çözüm — CA-signed Sertifika
 
-**Let's Encrypt (ücretsiz):**
+**Probe API HTTPS (Caddy, 8445):**
+
+```powershell
+Get-ScheduledTask -TaskName RdpVirtualBoxApp-Caddy | Start-ScheduledTask
+Invoke-WebRequest -Uri https://127.0.0.1:8445/health -SkipCertificateCheck
+```
+
+Let's Encrypt için `RDPVB_CADDY_DOMAIN` gerekir; 443 IIS/RD Gateway'dedir.
+
+**RD Gateway / RDP için Let's Encrypt (ücretsiz):**
 
 1. **win-acme** indirin: <https://www.win-acme.com/>
 2. `wacs.exe` çalıştırın → Simple ACME → Manual → CSR oluşturun.

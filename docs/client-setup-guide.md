@@ -17,6 +17,9 @@ Bu belge, **son kullanıcılar** için **Rdp Virtual Box App — Client Setup** 
   - [3.3 Uygulama ve Bağlantı Tipi Seçimi](#33-uygulama-ve-bağlantı-tipi-seçimi)
   - [3.4 İnceleme ve Install](#34-inceleme-ve-install)
 - [Kısayol Kullanımı](#kısayol-kullanımı)
+- [macOS Kurulumu (Web Modu)](#macos-kurulumu-web-modu)
+- [Android Kurulumu](#android-kurulumu)
+- [iOS Kurulumu](#ios-kurulumu)
 - [Sorun Giderme](#sorun-giderme)
 
 ---
@@ -235,6 +238,35 @@ macOS kullanıcıları için iki yol vardır:
 5. 4 adımlı SwiftUI sihirbazını takip edin (Windows sihirbazıyla aynı adımlar).
 
 Detaylı bilgi için: [macos-setup-guide.md](macos-setup-guide.md)
+
+---
+
+## Android Kurulumu
+
+Android kullanıcıları için iki yol vardır:
+
+### Seçenek A: Web Modu
+
+Chrome veya Edge ile `http://<sunucu>:8444/download` adresini açın. İndirilen `.rdp` dosyasını Microsoft Remote Desktop ile açın.
+
+### Seçenek B: Native Client (Kotlin APK)
+
+1. `src/android/ExfinRemoteApp` projesinden (veya CI artifact) APK kurun.
+2. Play Store'dan **Microsoft Remote Desktop** yükleyin.
+3. EXFIN RemoteAPP uygulamasında sunucu IP + port **8444** ile tarayıp RemoteApp seçin.
+
+Detaylı bilgi için: [android-setup-guide.md](android-setup-guide.md)
+
+---
+
+## iOS Kurulumu
+
+1. Mac'te `brew install xcodegen`
+2. `src/ios/ExfinRemoteApp` içinde `bash generate-xcode.sh`
+3. Xcode'da Team seçip cihaz veya simülatöre Run
+4. App Store'dan **Microsoft Remote Desktop** yükleyin
+
+Detaylı bilgi için: [ios-setup-guide.md](ios-setup-guide.md)
 
 ---
 

@@ -79,6 +79,7 @@ Server Core (GUI olmayan) üzerinde çalışır. Ancak:
 | 3389 | TCP | RDP | Direct RDP bağlantısı |
 | 443 | TCP | HTTPS | RD Web Access + RD Gateway |
 | 8443 | TCP | HTTPS | Apache Guacamole (fallback) |
+| 8444 | TCP | HTTP  | Probe REST API (macOS / HTTP istemcileri) |
 | 5985 | TCP | WinRM (HTTP) | Client ServerProbe için |
 | 5986 | TCP | WinRM (HTTPS) | Client ServerProbe için (önerilen) |
 
@@ -98,6 +99,7 @@ Server Core (GUI olmayan) üzerinde çalışır. Ancak:
 New-NetFirewallRule -DisplayName "RDP 3389"          -Direction Inbound -LocalPort 3389 -Protocol TCP -Action Allow
 New-NetFirewallRule -DisplayName "RD Web 443"        -Direction Inbound -LocalPort 443  -Protocol TCP -Action Allow
 New-NetFirewallRule -DisplayName "Guacamole 8443"    -Direction Inbound -LocalPort 8443 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "Probe API 8444"    -Direction Inbound -LocalPort 8444 -Protocol TCP -Action Allow
 New-NetFirewallRule -DisplayName "WinRM 5985/5986"   -Direction Inbound -LocalPort 5985-5986 -Protocol TCP -Action Allow
 ```
 
