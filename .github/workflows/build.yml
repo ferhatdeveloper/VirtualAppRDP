@@ -253,16 +253,27 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Assemble release APK
+      - name: Assemble signed release APK
         working-directory: src/android/ExfinRemoteApp
         run: chmod +x gradlew && ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify APK is signed
+        working-directory: src/android/ExfinRemoteApp
+        run: |
+          set -euo pipefail
+          ls -la app/build/outputs/apk/release/
+          test -f app/build/outputs/apk/release/app-release.apk
+          if ls app/build/outputs/apk/release/*unsigned*.apk >/dev/null 2>&1; then
+            echo "Unsigned APK produced; Android will refuse install."
+            exit 1
+          fi
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: exfin-remoteapp-android
-          path: src/android/ExfinRemoteApp/app/build/outputs/apk/release/*.apk
-          if-no-files-found: warn
+          path: src/android/ExfinRemoteApp/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
           retention-days: 30
 
   build-ios:

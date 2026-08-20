@@ -53,8 +53,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            if (canSign) {
-                signingConfig = signingConfigs.getByName("release")
+            // Play Store keystore yoksa debug anahtariyla imzala; imzasiz APK Android'de "yuklenemedi" olur.
+            signingConfig = if (canSign) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
