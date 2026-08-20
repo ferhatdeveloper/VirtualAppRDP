@@ -253,6 +253,14 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Create sideload keystore
+        working-directory: src/android/ExfinRemoteApp
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt -keystore sideload.jks -alias androiddebugkey \
+            -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=EXFIN RemoteAPP Sideload,O=EXFIN,C=TR"
+
       - name: Assemble signed release APK
         working-directory: src/android/ExfinRemoteApp
         run: chmod +x gradlew && ./gradlew assembleRelease --no-daemon --stacktrace
@@ -261,12 +269,11 @@ jobs:
         working-directory: src/android/ExfinRemoteApp
         run: |
           set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
           ls -la app/build/outputs/apk/release/
-          test -f app/build/outputs/apk/release/app-release.apk
-          if ls app/build/outputs/apk/release/*unsigned*.apk >/dev/null 2>&1; then
-            echo "Unsigned APK produced; Android will refuse install."
-            exit 1
-          fi
+          test -f "$APK"
+          unzip -l "$APK" | grep -E 'META-INF/.*\.(RSA|DSA|EC|SF)$'
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose "$APK"
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
