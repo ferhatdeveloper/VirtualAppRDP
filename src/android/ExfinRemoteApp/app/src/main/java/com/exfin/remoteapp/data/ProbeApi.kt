@@ -149,6 +149,8 @@ class ProbeApi(
             path += if (path.contains("?")) "&" else "?"
             path += "client=${enc(clientId)}"
         }
+        path += if (path.contains("?")) "&" else "?"
+        path += "platform=android"
         val req = authorized(Request.Builder().url(baseUrl + path).get())
         client.newCall(req.build()).execute().use { resp ->
             val body = resp.body?.string().orEmpty()

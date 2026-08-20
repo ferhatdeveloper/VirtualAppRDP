@@ -1594,13 +1594,21 @@ function New-RemoteAppRdpText {
         [string]$DisplayName,
         [string]$UserName,
         [string]$GatewayHost,
-        [int]$GatewayPort = 443
+        [int]$GatewayPort = 443,
+        [string]$FilePath,
+        [switch]$Mobile
     )
     if ([string]::IsNullOrWhiteSpace($DisplayName)) { $DisplayName = $Alias }
     if ([string]::IsNullOrWhiteSpace($UserName)) {
         $dom = $env:USERDOMAIN
         if ([string]::IsNullOrWhiteSpace($dom)) { $dom = $env:COMPUTERNAME }
         $UserName = '{0}\{1}' -f $dom, $env:USERNAME
+    }
+    $shell = 'rdpinit.exe'
+    $workDir = ''
+    if ($Mobile -and -not [string]::IsNullOrWhiteSpace($FilePath)) {
+        $shell = $FilePath.Trim()
+        try { $workDir = [System.IO.Path]::GetDirectoryName($shell) } catch { $workDir = '' }
     }
     $lines = @(
         "full address:s:$TargetIp"
@@ -1614,10 +1622,11 @@ function New-RemoteAppRdpText {
         'remoteapplicationmode:i:1'
         "remoteapplicationprogram:s:||$Alias"
         "remoteapplicationname:s:$DisplayName"
+        'remoteapplicationcmdline:s:'
         'disableremoteappcapscheck:i:1'
-        'alternate shell:s:rdpinit.exe'
+        "alternate shell:s:$shell"
         'screen mode id:i:2'
-        'use multimon:i:1'
+        'use multimon:i:0'
         'audiomode:i:0'
         'redirectprinters:i:0'
         'redirectcomports:i:0'
@@ -1627,6 +1636,15 @@ function New-RemoteAppRdpText {
         'bandwidthautodetect:i:1'
         'networkautodetect:i:1'
     )
+    if (-not [string]::IsNullOrWhiteSpace($workDir)) {
+        $lines += "shell working directory:s:$workDir"
+    }
+    if ($Mobile) {
+        $lines += @(
+            'smart sizing:i:1'
+            'dynamic resolution:i:1'
+        )
+    }
     if (-not [string]::IsNullOrWhiteSpace($GatewayHost)) {
         $gh = $GatewayHost.Trim()
         if ($GatewayPort -ge 1 -and $GatewayPort -ne 443) {
@@ -1709,7 +1727,8 @@ function Get-RemoteAppRdpDownload {
     param(
         [Parameter(Mandatory)][string]$FileName,
         [string]$CustomerId,
-        [int]$RdpPort = 0
+        [int]$RdpPort = 0,
+        [switch]$Mobile
     )
 
     $safe = [string]$FileName
@@ -1753,6 +1772,7 @@ function Get-RemoteAppRdpDownload {
     if (-not $app) { $app = $apps | Select-Object -First 1 }
     $appAlias = [string]$app['alias']; if (-not $appAlias) { $appAlias = [string]$app.alias }
     $appName  = [string]$app['name']; if (-not $appName) { $appName = [string]$app.name }
+    $appPath  = [string]$app['path']; if (-not $appPath) { $appPath = [string]$app.path }
 
     $publicIp = [string]$cust['publicIp']; if (-not $publicIp) { $publicIp = [string]$cust.publicIp }
     $lanIp = [string]$cust['lanIp']; if (-not $lanIp) { $lanIp = [string]$cust.lanIp }
@@ -1792,7 +1812,7 @@ function Get-RemoteAppRdpDownload {
         elseif ($kind -eq 'gateway') { 'Gateway' }
         else { 'VPN' }
     ))
-    $text = New-RemoteAppRdpText -TargetIp $hostIp -Port $port -Alias $appAlias -DisplayName $appName -GatewayHost $useGw -GatewayPort $gwPort
+    $text = New-RemoteAppRdpText -TargetIp $hostIp -Port $port -Alias $appAlias -DisplayName $appName -GatewayHost $useGw -GatewayPort $gwPort -FilePath $appPath -Mobile:$Mobile
     return [ordered]@{ FileName = $outName; Content = $text; Host = $(if ($useGw) { $useGw } else { $hostIp }); Port = $(if ($useGw) { $gwPort } else { $port }) }
 }
 
@@ -2255,7 +2275,11 @@ function Invoke-ProbeApiRequest {
                         return New-ProbeApiHttpResponse -Status 403 -Body @{ error = 'client_not_approved'; hint = 'Istemci kaydi sunucuda onaylanmali' }
                     }
                 }
-                $dl = Get-RemoteAppRdpDownload -FileName $file -CustomerId $cid -RdpPort $ovr
+                $ua = Get-HeaderValue -Headers $headers -Name 'User-Agent'
+                $plat = ''
+                if ($query['platform']) { $plat = [string]$query['platform'] }
+                $mobile = ($plat -match '(?i)android|ios|mobile') -or ($ua -match '(?i)Android|iPhone|iPad|EXFIN-RemoteAPP-Android|EXFIN-RemoteAPP-iOS')
+                $dl = Get-RemoteAppRdpDownload -FileName $file -CustomerId $cid -RdpPort $ovr -Mobile:$mobile
                 if ($null -eq $dl) {
                     return New-ProbeApiHttpResponse -Status 404 -Body @{ error = 'not_found'; path = $pathNorm }
                 }

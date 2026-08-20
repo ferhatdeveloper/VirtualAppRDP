@@ -191,7 +191,7 @@ class WizardViewModel(application: Application) : AndroidViewModel(application) 
                         connectMessage = if (isWeb) {
                             "Web HTML5 tarayıcıda açıldı."
                         } else {
-                            "RDP dosyası açıldı: ${file.fileName.ifBlank { app.name }}"
+                            "RemoteApp açılıyor: ${app.name} (tam masaüstü değil)."
                         }
                     )
                 }

@@ -236,7 +236,7 @@ private fun StepProbe(state: WizardUiState, vm: WizardViewModel) {
 private fun StepApps(state: WizardUiState, vm: WizardViewModel) {
     Text("Adım 3 · RemoteApp seçimi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
-    Text("Yayınlı uygulamalardan birini ve bağlantı yolunu seçin. Dışarıdan RD Gateway (443) önerilir.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text("Yayınlı RemoteApp’lerden birini seçin. Telefonda tam masaüstü değil, seçilen uygulama açılır.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(12.dp))
     if (state.apps.isEmpty()) {
         StatusLine("Henüz uygulama yok. Önce sunucuyu tarayın.", error = false)
@@ -324,7 +324,7 @@ private fun StepConnect(state: WizardUiState, vm: WizardViewModel) {
         if (isWeb) {
             "HTML5 RD Web tarayıcıda açılır. Windows parolası web girişinde sorulur."
         } else {
-            "Cihaz kaydedilir, .rdp indirilir ve Microsoft Remote Desktop ile açılır. Dışarıdan RD Gateway (TCP 443) kullanın. Windows parolası RDP istemcisinde sorulur."
+            "Cihaz kaydedilir, RemoteApp .rdp indirilir ve Microsoft Remote Desktop / Windows App ile yalnızca seçilen uygulama açılır (tam masaüstü değil). Dışarıdan RD Gateway (TCP 443) kullanın. Windows parolası RDP istemcisinde sorulur."
         },
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
