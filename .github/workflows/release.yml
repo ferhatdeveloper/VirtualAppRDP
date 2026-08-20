@@ -46,6 +46,23 @@ jobs:
           }
           Write-Host "ISCC ready: $iscc"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: src/dashboard/package-lock.json
+
+      - name: Build React dashboard
+        working-directory: src/dashboard
+        shell: pwsh
+        run: |
+          npm ci
+          npm run build
+          if (-not (Test-Path -LiteralPath 'dist\index.html')) {
+            throw "Dashboard dist/index.html missing after vite build"
+          }
+
       - name: Compile Client and Server setup (ISCC)
         shell: pwsh
         run: |
