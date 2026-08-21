@@ -11,6 +11,9 @@ Versiyonlama [Semantic Versioning](https://semver.org/) kurallarına uyar.
 
 ### Eklenenler (Added)
 
+- **Web RDP / Gateway** — Genel kullanici sayfasi `GET /web` (Direct .rdp, RD Gateway .rdp, tarayici HTML5). Panelde baglanti modu: Direct, RD Gateway (TCP 443), Web. Durum `GET /api/web`. HTML5 icin RD Web Client veya Guacamole 8443 gerekir.
+- **Android Gateway / Web** — Istemci `RD Gateway (443)` `.rdp` ve `Web (tarayici)` HTML5 yolunu listeler. WAN icin Gateway onerilir; sertifika `/gateway.cer`. GHA APK `sideload.jks` ile v1/v2/v3 imzalanir; imzasiz APK Android'de yuklenmez. Android `.rdp` RemoteApp (`remoteapplicationmode:i:1` + EXE kabugu); tam masaustu oturumu acilmaz.
+- **RD Web feed (workgroup)** — `Publish-RdWebFeed.ps1` HTML5 katalogunu yerel Session Host `TSAppAllowList` uygulamalarina baglar (`ws08r2rdserver`). Domain koleksiyonu olmadan Tiger3Ent RD Web Client'ta gorunur.
 - **Android istemci** — `src/android/ExfinRemoteApp/` Kotlin / Jetpack Compose 4 adimlik sihirbaz. Probe API (8444), uygulama listesi, Public/LAN/VPN `.rdp` indirme, `POST /api/clients` cihaz kaydi, Microsoft Remote Desktop ile acma. Kilavuz: `docs/android-setup-guide.md`.
 - **Android imza / Play Store** — `keystore.properties` veya `EXFIN_KEYSTORE_*` ile `assembleRelease` / `bundleRelease`. `src/android/New-ReleaseKeystore.ps1` yerel upload JKS uretir (repoya yazılmaz).
 - **iOS istemci** — `src/ios/ExfinRemoteApp/` SwiftUI 4 adimlik sihirbaz (XcodeGen). Ayni Probe API; `.rdp` Paylas / Microsoft Remote Desktop. Kilavuz: `docs/ios-setup-guide.md`.

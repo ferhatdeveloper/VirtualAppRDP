@@ -23,8 +23,8 @@ android {
         applicationId = "com.exfin.remoteapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 115
-        versionName = "1.1.5"
+        versionCode = 117
+        versionName = "1.1.6"
         vectorDrawables.useSupportLibrary = true
     }
 
@@ -37,24 +37,37 @@ android {
         !ksAlias.isNullOrBlank() &&
         !ksKeyPass.isNullOrBlank() &&
         file(ksFile!!).isFile
-    if (canSign) {
-        val storePath = ksFile!!
-        val storePw = ksPass!!
-        val alias = ksAlias!!
-        val keyPw = ksKeyPass!!
-        signingConfigs.create("release") {
-            storeFile = file(storePath)
-            storePassword = storePw
-            keyAlias = alias
-            keyPassword = keyPw
+    val sideloadKs = rootProject.file("sideload.jks")
+    signingConfigs {
+        create("sideload") {
+            storeFile = sideloadKs
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+        if (canSign) {
+            create("release") {
+                storeFile = file(ksFile!!)
+                storePassword = ksPass!!
+                keyAlias = ksAlias!!
+                keyPassword = ksKeyPass!!
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            if (canSign) {
-                signingConfig = signingConfigs.getByName("release")
+            signingConfig = when {
+                canSign -> signingConfigs.getByName("release")
+                sideloadKs.isFile -> signingConfigs.getByName("sideload")
+                else -> signingConfigs.getByName("debug")
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -62,8 +75,12 @@ android {
             )
         }
         debug {
-            applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            signingConfig = if (sideloadKs.isFile) {
+                signingConfigs.getByName("sideload")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

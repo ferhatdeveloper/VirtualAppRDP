@@ -253,16 +253,34 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Assemble release APK
+      - name: Create sideload keystore
+        working-directory: src/android/ExfinRemoteApp
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -noprompt -keystore sideload.jks -alias androiddebugkey \
+            -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=EXFIN RemoteAPP Sideload,O=EXFIN,C=TR"
+
+      - name: Assemble signed release APK
         working-directory: src/android/ExfinRemoteApp
         run: chmod +x gradlew && ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify APK is signed
+        working-directory: src/android/ExfinRemoteApp
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          ls -la app/build/outputs/apk/release/
+          test -f "$APK"
+          unzip -l "$APK" | grep -E 'META-INF/.*\.(RSA|DSA|EC|SF)$'
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose "$APK"
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: exfin-remoteapp-android
-          path: src/android/ExfinRemoteApp/app/build/outputs/apk/release/*.apk
-          if-no-files-found: warn
+          path: src/android/ExfinRemoteApp/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
           retention-days: 30
 
   build-ios:

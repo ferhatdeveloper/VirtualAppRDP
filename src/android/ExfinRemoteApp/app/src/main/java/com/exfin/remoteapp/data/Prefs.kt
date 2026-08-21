@@ -30,6 +30,6 @@ class Prefs(context: Context) {
         set(value) { sp.edit().putString("customerId", value.trim()).apply() }
 
     var kind: String
-        get() = sp.getString("kind", "lan").orEmpty().ifBlank { "lan" }
+        get() = sp.getString("kind", "gateway").orEmpty().ifBlank { "gateway" }
         set(value) { sp.edit().putString("kind", value).apply() }
 }

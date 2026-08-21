@@ -45,15 +45,20 @@ object RdpLauncher {
     }
 
     fun saveAndOpen(context: Context, fileName: String, content: String) {
+        val remoteApp = content.contains("remoteapplicationmode:i:1", ignoreCase = true)
+        if (!remoteApp) {
+            throw IllegalStateException("Sunucu tam masaüstü .rdp gönderdi. RemoteApp bekleniyor.")
+        }
         val safe = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "app.rdp" }
         val dir = File(context.cacheDir, "rdp").apply { mkdirs() }
         val file = File(dir, safe)
-        file.writeText(content.replace("\n", "\r\n"))
+        val normalized = content.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+        file.writeText(normalized)
         val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
 
         val view = Intent(Intent.ACTION_VIEW).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            setDataAndType(uri, "application/x-rdp")
+            setDataAndType(uri, "application/rdp")
         }
         val installed = rdPackages.firstOrNull { pkg ->
             try {
@@ -72,8 +77,9 @@ object RdpLauncher {
             context.startActivity(view)
         } catch (_: ActivityNotFoundException) {
             view.setPackage(null)
+            view.setDataAndType(uri, "application/x-rdp")
             try {
-                val chooser = Intent.createChooser(view, "RDP dosyasını aç")
+                val chooser = Intent.createChooser(view, "RemoteApp .rdp aç")
                 chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(chooser)
             } catch (_: Exception) {

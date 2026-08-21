@@ -22,7 +22,21 @@ data class CustomerInfo(
     val lanIp: String,
     val vpnIp: String,
     val rdpPort: Int,
-    val lanRdpPort: Int
+    val lanRdpPort: Int,
+    val connectMode: String = "direct",
+    val gatewayHost: String = "",
+    val gatewayPort: Int = 443
+)
+
+data class WebInfo(
+    val resolvedKind: String,
+    val gatewayHost: String,
+    val gatewayPort: Int,
+    val gatewayRunning: Boolean,
+    val rdWebHtml5: Boolean,
+    val launchLan: String,
+    val launchPublic: String,
+    val hint: String
 )
 
 data class PortalInfo(

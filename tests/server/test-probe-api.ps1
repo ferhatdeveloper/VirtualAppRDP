@@ -154,7 +154,23 @@ Describe 'ProbeApi' {
             $resp = Invoke-ProbeApiRequest -Request $req
             $resp.status | Should -Be 200
             $resp.body   | Should -Match 'remoteapplicationmode:i:1'
+            $resp.body   | Should -Match 'remoteapplicationprogram:s:\|\|'
             $resp.body   | Should -Match 'server port:i:'
+            $resp.body   | Should -Not -Match 'use multimon:i:1'
+        }
+
+        It 'android download uses RemoteApp exe shell not full desktop' {
+            $req = [pscustomobject]@{
+                Method  = 'GET'
+                Path    = '/rdp/tiger3ent-gateway.rdp'
+                Headers = @{ 'User-Agent' = 'EXFIN-RemoteAPP-Android/1.1.5' }
+                Query   = @{ platform = 'android' }
+            }
+            $resp = Invoke-ProbeApiRequest -Request $req
+            $resp.status | Should -Be 200
+            $resp.body   | Should -Match 'remoteapplicationmode:i:1'
+            $resp.body   | Should -Match 'Tiger3Enterprise.exe'
+            $resp.body   | Should -Match 'use multimon:i:0'
         }
 
         It 'honors RDPVB_RDP_PORT in generated rdp' {
