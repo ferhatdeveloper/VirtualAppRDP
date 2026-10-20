@@ -104,6 +104,7 @@ Name: "{userdocs}\{#MyAppShortName}"; Permissions: users-modify
 [Icons]
 ; Start Menu shortcuts
 Name: "{group}\{#MyAppName} Setup"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\powershell\{#MyAppExeName}"""; WorkingDir: "{app}"; Comment: "{cm:LaunchSetupComment}"; IconFilename: "{app}\assets\icon.ico"
+Name: "{group}\SQL Bridge Durumu"; Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\powershell\SqlBridgeClient.ps1"" -Mode Status"; WorkingDir: "{app}\powershell"; Comment: "Sunucu SQL localhost tüneli durumu"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\{#MyAppName} README"; Filename: "{app}\assets\README.url"; IconFilename: "{app}\assets\icon.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\icon.ico"
 

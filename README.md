@@ -47,6 +47,7 @@ Sıralama önemlidir: **Önce Server kurulur, sonra Client dağıtılır.**
 ## Özellikler / Features
 
 - **Tamamen generic** — yayınlanan uygulamalar sunucuda ne varsa odur (ERP, muhasebe, raporlama, özel exe).
+- **SQL Bridge** — sunucu SQL’ini istemci PC’de `127.0.0.1` gibi kullanın (SSMS / yerel uygulamalar); Probe API tüneli, SQL portu internete açılmaz. [docs/sql-bridge.md](docs/sql-bridge.md)
 - **Çoklu bağlantı stratejisi** — Direct / RD Gateway / Apache Guacamole / Tailscale / Cloudflare Tunnel / Hybrid (birden fazlasını aynı anda seçebilirsiniz).
 - **HTML5 fallback** — RD Web lisansı yoksa otomatik Apache Guacamole kurulumu önerir.
 - **Credential Manager** entegrasyonu — şifre düz metin kaydedilmez.
@@ -192,6 +193,7 @@ flowchart LR
 - [docs/ios-setup-guide.md](docs/ios-setup-guide.md) — iOS Native Client
 - [docs/licensing-and-rdweb.md](docs/licensing-and-rdweb.md) — RD Web lisansı ve Guacamole karşılaştırması
 - [docs/troubleshooting.md](docs/troubleshooting.md) — Yaygın hatalar ve çözümler
+- [docs/sql-bridge.md](docs/sql-bridge.md) — Sunucu SQL’ini localhost gibi kullanma (SSMS tüneli)
 
 ---
 

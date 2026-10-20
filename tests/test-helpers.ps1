@@ -66,6 +66,7 @@ function New-RdsMockContext {
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
+    param()
 
     return @{
         Calls = New-Object System.Collections.Generic.List[object]
@@ -112,11 +113,13 @@ function Assert-ThrowsWithMessage {
     $thrown.Exception.Message | Should -Match $ExpectedMessage
 }
 
-Export-ModuleMember -Function @(
-    'Get-RdsTestScratchDir'
-    'New-RdsTestLogPath'
-    'New-RdsMockContext'
-    'Format-RdsTestCredentialTarget'
-    'ConvertTo-RdsTestSecureString'
-    'Assert-ThrowsWithMessage'
-)
+if ($MyInvocation.MyCommand.Path -and $MyInvocation.MyCommand.Path -like '*.psm1') {
+    Export-ModuleMember -Function @(
+        'Get-RdsTestScratchDir'
+        'New-RdsTestLogPath'
+        'New-RdsMockContext'
+        'Format-RdsTestCredentialTarget'
+        'ConvertTo-RdsTestSecureString'
+        'Assert-ThrowsWithMessage'
+    )
+}

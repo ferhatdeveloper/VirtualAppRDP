@@ -61,6 +61,11 @@ $script:StopFile    = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config\probe-
 
 . (Join-Path $PSScriptRoot 'ProbeApi.ps1')
 
+$script:SqlBridgeModule = Join-Path $PSScriptRoot 'SqlBridge.ps1'
+if (Test-Path -LiteralPath $script:SqlBridgeModule) {
+    . $script:SqlBridgeModule
+}
+
 function Write-ProbeHostLog {
     param(
         [string]$Message,
@@ -200,10 +205,48 @@ function Send-HttpResponse {
     $Stream.Flush()
 }
 
+function Send-RawHttpStatus {
+    param(
+        [System.Net.Sockets.NetworkStream]$Stream,
+        [int]$Status,
+        [string]$Reason,
+        [string]$BodyJson = ''
+    )
+    if ([string]::IsNullOrWhiteSpace($Reason)) {
+        $Reason = switch ($Status) {
+            200 { 'Connection Established' }
+            401 { 'Unauthorized' }
+            403 { 'Forbidden' }
+            503 { 'Service Unavailable' }
+            default { 'Error' }
+        }
+    }
+    $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($BodyJson)
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append("HTTP/1.1 $Status $Reason`r`n")
+    [void]$sb.Append("Server: RdpVirtualBoxApp-ProbeApi/$($Script:ProbeApiVersion)`r`n")
+    if ($Status -eq 200 -and [string]::IsNullOrEmpty($BodyJson)) {
+        [void]$sb.Append("Connection: keep-alive`r`n")
+        [void]$sb.Append("`r`n")
+    } else {
+        [void]$sb.Append("Connection: close`r`n")
+        [void]$sb.Append("Content-Type: application/json; charset=utf-8`r`n")
+        [void]$sb.Append("Content-Length: $($bodyBytes.Length)`r`n")
+        [void]$sb.Append("`r`n")
+    }
+    $headerBytes = [System.Text.Encoding]::ASCII.GetBytes($sb.ToString())
+    $Stream.Write($headerBytes, 0, $headerBytes.Length)
+    if ($bodyBytes.Length -gt 0 -and $Status -ne 200) {
+        $Stream.Write($bodyBytes, 0, $bodyBytes.Length)
+    }
+    $Stream.Flush()
+}
+
 function Invoke-ProbeClientSession {
     param([System.Net.Sockets.TcpClient]$Client)
 
     $stream = $null
+    $handedOff = $false
     try {
         $stream = $Client.GetStream()
         $stream.ReadTimeout  = 15000
@@ -244,12 +287,93 @@ function Invoke-ProbeClientSession {
         try {
             $req | Add-Member -NotePropertyName RemoteIp -NotePropertyValue $Client.Client.RemoteEndPoint.Address.ToString() -Force
         } catch {}
+
+        # --- SQL Bridge: HTTP CONNECT /sql-bridge -> yerel SQL TCP ---
+        $methodUp = ([string]$req.Method).ToUpperInvariant()
+        $pathLow = ([string]$req.Path).TrimEnd('/').ToLowerInvariant()
+        if ($methodUp -eq 'CONNECT' -and ($pathLow -eq '/sql-bridge' -or $pathLow -eq '/api/sql-bridge')) {
+            if (-not (Get-Command -Name 'Test-SqlBridgeConnectAllowed' -ErrorAction SilentlyContinue)) {
+                Send-RawHttpStatus -Stream $stream -Status 503 -Reason 'Service Unavailable' -BodyJson '{"error":"sql_bridge_module_missing"}'
+                return
+            }
+            $authHeader = Get-HeaderValue -Headers $req.Headers -Name 'Authorization'
+            $token = ''
+            if ($authHeader -and $authHeader -like 'Bearer *') {
+                $token = $authHeader.Substring(7).Trim()
+            }
+            $gate = Test-SqlBridgeConnectAllowed -ProvidedToken $token
+            if (-not $gate.ok) {
+                $body = (@{ error = [string]$gate.error } | ConvertTo-Json -Compress)
+                Send-RawHttpStatus -Stream $stream -Status ([int]$gate.status) -BodyJson $body
+                return
+            }
+
+            Send-RawHttpStatus -Stream $stream -Status 200 -Reason 'Connection Established'
+            Write-ProbeHostLog -Message ("SQL Bridge CONNECT kabul ($($gate.sqlHost):$($gate.sqlPort)) from $($req.RemoteIp)")
+
+            $sqlHost = [string]$gate.sqlHost
+            $sqlPort = [int]$gate.sqlPort
+            $logPath = $script:LogFile
+            $rs = [runspacefactory]::CreateRunspace()
+            $rs.Open()
+            $ps = [powershell]::Create()
+            $ps.Runspace = $rs
+            [void]$ps.AddScript({
+                param($client, $clientStream, $hostName, $port, $logFile)
+                $sqlClient = $null
+                $sqlStream = $null
+                try {
+                    $clientStream.ReadTimeout = -1
+                    $clientStream.WriteTimeout = -1
+                    $sqlClient = New-Object System.Net.Sockets.TcpClient
+                    $sqlClient.NoDelay = $true
+                    $sqlClient.Connect($hostName, $port)
+                    $sqlStream = $sqlClient.GetStream()
+                    $sqlStream.ReadTimeout = -1
+                    $sqlStream.WriteTimeout = -1
+                    $copy = {
+                        param($src, $dst)
+                        try {
+                            $buf = New-Object byte[] 16384
+                            while ($true) {
+                                $n = $src.Read($buf, 0, $buf.Length)
+                                if ($n -le 0) { break }
+                                $dst.Write($buf, 0, $n)
+                                $dst.Flush()
+                            }
+                        } catch { }
+                    }
+                    $p1 = [powershell]::Create().AddScript($copy).AddArgument($clientStream).AddArgument($sqlStream)
+                    $p2 = [powershell]::Create().AddScript($copy).AddArgument($sqlStream).AddArgument($clientStream)
+                    $h1 = $p1.BeginInvoke()
+                    $h2 = $p2.BeginInvoke()
+                    [void][System.Threading.WaitHandle]::WaitAny(@($h1.AsyncWaitHandle, $h2.AsyncWaitHandle))
+                    try { $p1.EndInvoke($h1) } catch { }
+                    try { $p2.EndInvoke($h2) } catch { }
+                    $p1.Dispose(); $p2.Dispose()
+                } catch {
+                    try {
+                        $line = '[{0}] [ERROR] SQL Bridge relay: {1}' -f (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'), $_.Exception.Message
+                        Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
+                    } catch { }
+                } finally {
+                    if ($sqlStream) { try { $sqlStream.Dispose() } catch { } }
+                    if ($sqlClient) { try { $sqlClient.Close() } catch { } }
+                    if ($clientStream) { try { $clientStream.Dispose() } catch { } }
+                    if ($client) { try { $client.Close() } catch { } }
+                }
+            }).AddArgument($Client).AddArgument($stream).AddArgument($sqlHost).AddArgument($sqlPort).AddArgument($logPath)
+            [void]$ps.BeginInvoke()
+            $handedOff = $true
+            return
+        }
+
         $resp = Invoke-ProbeApiRequest -Request $req
         Send-HttpResponse -Stream $stream -Response $resp
     }
     catch {
         Write-ProbeHostLog -Level ERROR -Message "Request failed: $($_.Exception.Message)"
-        if ($stream -and $stream.CanWrite) {
+        if (-not $handedOff -and $stream -and $stream.CanWrite) {
             try {
                 $err = New-ProbeApiHttpResponse -Status 500 -Body @{ error = 'internal_error'; message = $_.Exception.Message }
                 Send-HttpResponse -Stream $stream -Response $err
@@ -257,8 +381,10 @@ function Invoke-ProbeClientSession {
         }
     }
     finally {
-        if ($stream) { try { $stream.Dispose() } catch { } }
-        try { $Client.Close() } catch { }
+        if (-not $handedOff) {
+            if ($stream) { try { $stream.Dispose() } catch { } }
+            try { $Client.Close() } catch { }
+        }
     }
 }
 
@@ -311,6 +437,7 @@ function Start-ProbeApiListenLoop {
             foreach ($listener in $listeners) {
                 if ($listener.Pending()) {
                     $client = $listener.AcceptTcpClient()
+                    # CONNECT /sql-bridge basarili olursa oturum arka plana birakilir ve hizli doner.
                     Invoke-ProbeClientSession -Client $client
                     $accepted = $true
                 }

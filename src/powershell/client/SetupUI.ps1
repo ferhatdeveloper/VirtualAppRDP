@@ -103,6 +103,8 @@ function New-SetupUiStrings {
             StatusError       = 'ERROR'
             RecommendedBadge  = ' (recommended)'
             EmbedWarning      = 'Embedding credentials in RDP files is not secure. Continue?'
+            SqlBridgeLabel    = 'SQL Bridge: use server SQL as localhost (SSMS / local apps)'
+            SqlBridgeHint     = 'Listens on 127.0.0.1:1433 and tunnels via Probe API (SQL port stays closed to the internet).'
         }
     }
 
@@ -158,6 +160,8 @@ function New-SetupUiStrings {
         StatusError       = 'HATA'
         RecommendedBadge  = ' (önerilen)'
         EmbedWarning      = 'Kimlik bilgisini RDP dosyasına gömmek güvenli değildir. Devam edilsin mi?'
+        SqlBridgeLabel    = 'SQL Bridge: sunucu SQL''ini localhost gibi kullan (SSMS / yerel uygulamalar)'
+        SqlBridgeHint     = '127.0.0.1:1433 dinler; Probe API tüneli ile sunucuya iletir (SQL portu internete açılmaz).'
     }
 }
 
@@ -320,6 +324,7 @@ function New-WizardState {
         AccessType      = 'Native'     # Native | Web | Both
         CredentialMode  = 'Ask'        # Ask | Save | Embed
         SelectedApps    = @()          # string[]  - app ids chosen on step 3
+        InstallSqlBridge = $false      # localhost SQL tunnel via Probe CONNECT
         CustomAppPath   = ''
         OutputDir       = ('{0}\Documents\RdpVirtualBoxApp' -f $env:USERPROFILE)
         CurrentStep     = 1
@@ -643,7 +648,7 @@ function New-Step3 {
     New-Label -Text $s.ChooseApps -X 20 -Y 80 -Width 560 -Height 20 -Parent $Panel
     $clb = New-Object System.Windows.Forms.CheckedListBox
     $clb.Location = New-Object System.Drawing.Point(20, 105)
-    $clb.Size     = New-Object System.Drawing.Size(560, 150)
+    $clb.Size     = New-Object System.Drawing.Size(560, 120)
     $clb.CheckOnClick = $true
     $clb.IntegralHeight = $false
     if ($State.Probe -and $State.Probe.existingRemoteApps) {
@@ -658,7 +663,7 @@ function New-Step3 {
     # Access type radios
     $gbAccess = New-Object System.Windows.Forms.GroupBox
     $gbAccess.Text  = $s.AccessTypeLabel
-    $gbAccess.Location = New-Object System.Drawing.Point(20, 265)
+    $gbAccess.Location = New-Object System.Drawing.Point(20, 235)
     $gbAccess.Size  = New-Object System.Drawing.Size(270, 100)
     $Panel.Controls.Add($gbAccess)
 
@@ -684,7 +689,7 @@ function New-Step3 {
     # Credential mode radios
     $gbCred = New-Object System.Windows.Forms.GroupBox
     $gbCred.Text  = $s.CredentialLabel
-    $gbCred.Location = New-Object System.Drawing.Point(310, 265)
+    $gbCred.Location = New-Object System.Drawing.Point(310, 235)
     $gbCred.Size  = New-Object System.Drawing.Size(270, 100)
     $Panel.Controls.Add($gbCred)
 
@@ -708,9 +713,21 @@ function New-Step3 {
     $rbEmbed.ForeColor = $p.Danger
     $gbCred.Controls.Add($rbEmbed)
 
+    # SQL Bridge (localhost tunnel) — RemoteApp olmadan sunucu SQL
+    $chkSql = New-Object System.Windows.Forms.CheckBox
+    $chkSql.Text = $s.SqlBridgeLabel
+    $chkSql.Location = New-Object System.Drawing.Point(20, 342)
+    $chkSql.Size = New-Object System.Drawing.Size(560, 22)
+    $chkSql.Checked = [bool]$State.InstallSqlBridge
+    if ($State.Probe -and $State.Probe.sqlBridge -and $State.Probe.sqlBridge.enabled) {
+        $chkSql.Checked = $true
+    }
+    $Panel.Controls.Add($chkSql)
+    New-Label -Text $s.SqlBridgeHint -Font $p.FontBody -ForeColor $p.SubtleText -X 40 -Y 364 -Width 540 -Height 18 -Parent $Panel
+
     # Custom app path
-    New-Label -Text $s.CustomAppPath -X 20 -Y 375 -Width 560 -Height 20 -Parent $Panel
-    $tbCustom = New-TextBox -X 20 -Y 400 -Width 560 -Parent $Panel
+    New-Label -Text $s.CustomAppPath -X 20 -Y 388 -Width 560 -Height 18 -Parent $Panel
+    $tbCustom = New-TextBox -X 20 -Y 408 -Width 560 -Parent $Panel
 
     $State['_clb']      = $clb
     $State['_rbNative'] = $rbNative
@@ -719,6 +736,7 @@ function New-Step3 {
     $State['_rbAsk']    = $rbAsk
     $State['_rbSave']   = $rbSave
     $State['_rbEmbed']  = $rbEmbed
+    $State['_chkSql']   = $chkSql
     $State['_tbCustom'] = $tbCustom
 
     $BackButton.Text = $s.BackButton
@@ -757,6 +775,7 @@ function Capture-Step3 {
     elseif ($State['_rbSave'].Checked)  { $State.CredentialMode = 'Save' }
     else                                { $State.CredentialMode = 'Embed' }
 
+    $State.InstallSqlBridge = [bool]$State['_chkSql'].Checked
     $State.CustomAppPath = $State['_tbCustom'].Text
 }
 
@@ -825,6 +844,7 @@ function Populate-Step4 {
     $lines += "Kullanıcı   : $($State.Server.Username)"
     $lines += "Erişim tipi : $($State.AccessType)"
     $lines += "Kimlik      : $($State.CredentialMode)"
+    $lines += "SQL Bridge  : $(if ($State.InstallSqlBridge) { 'Evet -> 127.0.0.1:1433' } else { 'Hayir' })"
     $lines += ""
     if ($State.SelectedApps -and $State.SelectedApps.Count -gt 0) {
         $lines += "Uygulamalar:"
@@ -1148,6 +1168,7 @@ $script:ClientModulesLoaded = @{
     Credential  = (Import-ClientModule -Name 'Credential.ps1')
     AppRegistry = (Import-ClientModule -Name 'AppRegistry.ps1')
     SelfTest    = (Import-ClientModule -Name 'SelfTest.ps1')
+    SqlBridge   = (Import-ClientModule -Name 'SqlBridgeClient.ps1')
 }
 
 # ---------------------------------------------------------------------------
@@ -1355,6 +1376,38 @@ function Start-ClientInstall {
                 Write-SetupLog -Message ("Self-test sonucu: {0}" -f ($report | Out-String))
             } catch {
                 Write-SetupLog -Level Warn -Message ("Self-test çalıştırılamadı: {0}" -f $_.Exception.Message)
+            }
+        }
+
+        # 6) SQL Bridge — sunucu SQL'ini localhost gibi kullan
+        if ($State.InstallSqlBridge) {
+            try {
+                $bridgeScript = Join-Path -Path $PSScriptRoot -ChildPath 'SqlBridgeClient.ps1'
+                if (-not (Test-Path -LiteralPath $bridgeScript)) {
+                    throw 'SqlBridgeClient.ps1 bulunamadi.'
+                }
+                $token = ''
+                if ($State.Probe -and $State.Probe.probeApi -and $State.Probe.probeApi.token) {
+                    $token = [string]$State.Probe.probeApi.token
+                }
+                if ([string]::IsNullOrWhiteSpace($token) -and $env:RDPVB_PROBE_TOKEN) {
+                    $token = [string]$env:RDPVB_PROBE_TOKEN
+                }
+                $localSqlPort = 1433
+                if ($State.Probe -and $State.Probe.sqlBridge -and $State.Probe.sqlBridge.sqlPort) {
+                    try { $localSqlPort = [int]$State.Probe.sqlBridge.sqlPort } catch { $localSqlPort = 1433 }
+                }
+                $installArgs = @{
+                    Mode      = 'Install'
+                    Server    = [string]$State.Server.Ip
+                    ProbePort = $probePort
+                    LocalPort = $localSqlPort
+                }
+                if (-not [string]::IsNullOrWhiteSpace($token)) { $installArgs.Token = $token }
+                $bridgeResult = & $bridgeScript @installArgs
+                Write-SetupLog -Message ("SQL Bridge kuruldu: {0}" -f ($bridgeResult | Out-String))
+            } catch {
+                Write-SetupLog -Level Warn -Message ("SQL Bridge kurulamadi: {0}" -f $_.Exception.Message)
             }
         }
 

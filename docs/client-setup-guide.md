@@ -129,6 +129,8 @@ Bu adımda:
 
 3. **Credential Manager'a kaydet:** şifrenizi Windows Credential Manager'a kaydetmek istiyorsanız işaretleyin (önerilir).
 
+4. **SQL Bridge** *(opsiyonel):* sunucu SQL’ini bu PC’de `127.0.0.1` gibi kullanmak için işaretleyin (SSMS / yerel uygulamalar). RemoteApp gerekmez. Ayrıntı: [sql-bridge.md](sql-bridge.md).
+
 **"İleri"** ile devam edin.
 
 ### 3.4 İnceleme ve Install

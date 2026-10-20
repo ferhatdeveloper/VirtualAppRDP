@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "enabled": false,
+  "sqlHost": "127.0.0.1",
+  "sqlPort": 1433,
+  "requireBearer": true,
+  "allowDirectLan": false,
+  "description": "Probe API CONNECT /sql-bridge tuneli ile istemci localhost:1433 -> sunucu SQL. SQL TCP portu internete acilmaz."
+}

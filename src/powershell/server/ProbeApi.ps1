@@ -22,6 +22,9 @@
         GET  /api/apps
         GET  /probe/api/status
         GET  /api/status
+        GET  /api/sql-bridge        SQL Bridge durumu (Bearer)
+        GET  /probe/api/sql-bridge
+        CONNECT /sql-bridge         Yerel SQL TCP tüneli (Start-ProbeApiHost)
         GET  /download              React dashboard (anonim)
         GET  /api/browse            Sunucu dosya gezgini (LAN / Bearer)
         POST /api/apps              RemoteApp yayinla (LAN / Bearer)
@@ -45,7 +48,13 @@ Set-StrictMode -Version Latest
 # Sabitler
 # ---------------------------------------------------------------------------
 
-$Script:ProbeApiVersion  = '1.1.5'
+$Script:ProbeApiVersion  = '1.1.6'
+
+# SQL Bridge (opsiyonel modul)
+$script:SqlBridgePs1 = Join-Path $PSScriptRoot 'SqlBridge.ps1'
+if ((Test-Path -LiteralPath $script:SqlBridgePs1) -and -not (Get-Command -Name 'Get-SqlBridgeStatus' -ErrorAction SilentlyContinue)) {
+    . $script:SqlBridgePs1
+}
 $Script:DefaultProbePath = '/probe/api/probe'
 $Script:DefaultProbePort = 8444
 $Script:RdpPort          = 3389
@@ -1280,6 +1289,14 @@ function Get-LocalServerProbeResult {
     if ($apps.Count -eq 0) { $recommendations.Add('Henuz RemoteApp yayinlanmamis. AppScanner + RemoteAppPublisher kullanin.') }
     if (-not $guacOk -and -not $rdWebOk) { $recommendations.Add('HTML5 erisim icin RD Web veya Guacamole kurun.') }
 
+    $sqlBridge = $null
+    if (Get-Command -Name 'Get-SqlBridgeStatus' -ErrorAction SilentlyContinue) {
+        try { $sqlBridge = Get-SqlBridgeStatus } catch { $sqlBridge = $null }
+    }
+    if ($sqlBridge -and $sqlBridge.enabled -and -not $sqlBridge.sqlReachable) {
+        $recommendations.Add('SQL Bridge acik ama yerel SQL TCP yanit vermiyor; SQL Server TCP/IP ve portu kontrol edin.')
+    }
+
     $probe = [ordered]@{
         server     = $ServerName
         reachable  = $true
@@ -1305,9 +1322,21 @@ function Get-LocalServerProbeResult {
             HTTPS_Port     = New-ProbeComponent -Name 'HTTPS_Port' -Status $(if ($httpsOpen) { 'ok' } else { 'warning' }) -Value $(if ($httpsOpen) { "$($Script:HttpsPort) open" } else { "$($Script:HttpsPort) closed/filtered" })
             Guacamole_Port = New-ProbeComponent -Name 'Guacamole_Port' -Status $(if ($guacOk) { 'ok' } else { 'warning' }) -Value $(if ($guacOk) { "$($Script:GuacamolePort) open" } else { "$($Script:GuacamolePort) closed/filtered" })
             ProbeApi_Port  = New-ProbeComponent -Name 'ProbeApi_Port' -Status $(if ($probeOpen) { 'ok' } else { 'warning' }) -Value $(if ($probeOpen) { "$($Script:DefaultProbePort) open" } else { "$($Script:DefaultProbePort) starting" })
+            SqlBridge      = $(
+                if (-not $sqlBridge) {
+                    New-ProbeComponent -Name 'SqlBridge' -Status 'warning' -Value 'Not configured'
+                } elseif ($sqlBridge.enabled -and $sqlBridge.sqlReachable) {
+                    New-ProbeComponent -Name 'SqlBridge' -Status 'ok' -Value ("enabled -> {0}:{1}" -f $sqlBridge.sqlHost, $sqlBridge.sqlPort)
+                } elseif ($sqlBridge.enabled) {
+                    New-ProbeComponent -Name 'SqlBridge' -Status 'warning' -Value ("enabled but SQL {0}:{1} unreachable" -f $sqlBridge.sqlHost, $sqlBridge.sqlPort)
+                } else {
+                    New-ProbeComponent -Name 'SqlBridge' -Status 'warning' -Value 'disabled'
+                }
+            )
             Certificate    = Get-LocalCertificateStatus
             License        = Get-LocalLicenseStatus
         }
+        sqlBridge = $sqlBridge
         existingRemoteApps = $null
         webEndpoint = [ordered]@{
             type               = $webType
@@ -1472,6 +1501,7 @@ function Get-ProbeStatus {
         }
         remoteAppCount = @($probe.existingRemoteApps).Count
         webEndpoint    = $probe.webEndpoint
+        sqlBridge      = $probe.sqlBridge
         generatedAt    = $probe.generatedAt
     }
 }
@@ -1497,6 +1527,9 @@ function Get-ProbeCatalog {
             [ordered]@{ method = 'GET';  path = '/api/browse';          auth = $true;  description = 'Sunucu klasor / EXE gezgini' }
             [ordered]@{ method = 'GET';  path = '/probe/api/status';    auth = $true;  description = 'Compact status' }
             [ordered]@{ method = 'GET';  path = '/api/status';          auth = $true;  description = 'Compact status (alias)' }
+            [ordered]@{ method = 'GET';  path = '/api/sql-bridge';      auth = $true;  description = 'SQL Bridge status (localhost tunnel)' }
+            [ordered]@{ method = 'GET';  path = '/probe/api/sql-bridge'; auth = $true;  description = 'SQL Bridge status (alias)' }
+            [ordered]@{ method = 'CONNECT'; path = '/sql-bridge';     auth = $true;  description = 'Raw TCP tunnel to local SQL' }
             [ordered]@{ method = 'GET';  path = '/download';            auth = $false; description = 'React RemoteApp dashboard' }
             [ordered]@{ method = 'GET'; path = '/rdp';                 auth = $false; description = 'Indirilebilir .rdp listesi' }
             [ordered]@{ method = 'GET'; path = '/rdp/public.rdp';      auth = $false; description = 'Public IP RemoteApp .rdp' }
@@ -2209,6 +2242,18 @@ function Invoke-ProbeApiRequest {
         '/api/clients'          { return (Invoke-ExfinAccessRequest -Request $Request -Method $method -PathNorm '/api/clients' -Query $query) }
         '/probe/api/status'     { return New-ProbeApiHttpResponse -Body (Get-ProbeStatus) }
         '/api/status'           { return New-ProbeApiHttpResponse -Body (Get-ProbeStatus) }
+        '/api/sql-bridge'       {
+            if (Get-Command -Name 'Get-SqlBridgeStatus' -ErrorAction SilentlyContinue) {
+                return New-ProbeApiHttpResponse -Body (Get-SqlBridgeStatus)
+            }
+            return New-ProbeApiHttpResponse -Status 503 -Body @{ error = 'sql_bridge_module_missing' }
+        }
+        '/probe/api/sql-bridge' {
+            if (Get-Command -Name 'Get-SqlBridgeStatus' -ErrorAction SilentlyContinue) {
+                return New-ProbeApiHttpResponse -Body (Get-SqlBridgeStatus)
+            }
+            return New-ProbeApiHttpResponse -Status 503 -Body @{ error = 'sql_bridge_module_missing' }
+        }
         '/download'             {
             $dash = Get-DashboardStaticResponse -RequestPath '/download'
             if ($dash) { return $dash }

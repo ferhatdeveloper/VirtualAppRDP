@@ -105,6 +105,7 @@ Sihirbaz başladığında her adımda ne yapılacağı aşağıda açıklanmış
 | **Apache Guacamole** | RD Web lisansı yoksa fallback |
 | **Tailscale** | NAT arkası cihazlar için mesh VPN |
 | **Cloudflare Tunnel** | Dışarıya port açmadan yayınlama |
+| **SQL Bridge** | İstemcide `localhost:1433` → sunucu SQL (Probe CONNECT tüneli; 1433 internete açılmaz). [sql-bridge.md](sql-bridge.md) |
 | **App kütüphanesi** | `AppScanner.ps1` ile sunucudaki .exe'leri tarar |
 
 ### 3.3 Lisans Kontrolü

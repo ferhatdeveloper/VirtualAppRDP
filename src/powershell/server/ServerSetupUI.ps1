@@ -204,6 +204,7 @@ $script:WizardData = [ordered]@{
     InstallCloudflare= $false
     InstallProbeApi  = $true
     InstallCaddySsl  = $true
+    InstallSqlBridge = $false
     PublishApps      = $true
     RdpPort          = 3389
     RdWebLicenseOk   = $false
@@ -450,7 +451,7 @@ $gbCert.Controls.Add($numRdpPort)
 $gbOther = New-Object System.Windows.Forms.GroupBox
 $gbOther.Text = 'Diger Bilesenler'
 $gbOther.Location = New-Object System.Drawing.Point(20, 200)
-$gbOther.Size = New-Object System.Drawing.Size(840, 265)
+$gbOther.Size = New-Object System.Drawing.Size(840, 290)
 $gbOther.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
 $p2.Controls.Add($gbOther)
 
@@ -462,6 +463,7 @@ $chkCf = New-Object System.Windows.Forms.CheckBox; $chkCf.Text = "Cloudflare Tun
 $chkAp = New-Object System.Windows.Forms.CheckBox; $chkAp.Text = "App Kutuphanesi (RemoteApp yayinlama)";        $chkAp.Checked = $true;  $chkAp.Location = New-Object System.Drawing.Point(15, 142); $chkAp.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkAp)
 $chkPa = New-Object System.Windows.Forms.CheckBox; $chkPa.Text = "Probe REST API (port 8444, macOS / HTTP istemcileri)"; $chkPa.Checked = $true; $chkPa.Location = New-Object System.Drawing.Point(15, 166); $chkPa.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkPa)
 $chkCy = New-Object System.Windows.Forms.CheckBox; $chkCy.Text = "Caddy SSL (HTTPS 8445, Probe API reverse proxy)"; $chkCy.Checked = $true; $chkCy.Location = New-Object System.Drawing.Point(15, 190); $chkCy.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkCy)
+$chkSql = New-Object System.Windows.Forms.CheckBox; $chkSql.Text = "SQL Bridge (istemci localhost:1433 -> sunucu SQL, Probe CONNECT tüneli)"; $chkSql.Checked = $false; $chkSql.Location = New-Object System.Drawing.Point(15, 214); $chkSql.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkSql)
 
 # Checkbox/radio state'leri Next handler'inda senkron olarak WizardData'ya yazilir
 # (parser-friendly: event handler baglama yerine snapshot okuma).
@@ -477,6 +479,7 @@ function Update-WizardDataFromStep2 {
     $script:WizardData.PublishApps       = [bool] $chkAp.Checked
     $script:WizardData.InstallProbeApi   = [bool] $chkPa.Checked
     $script:WizardData.InstallCaddySsl   = [bool] $chkCy.Checked
+    $script:WizardData.InstallSqlBridge  = [bool] $chkSql.Checked
     $script:WizardData.RdpPort           = [int] $numRdpPort.Value
     if ($rbSelf.Checked) {
         $script:WizardData.CertMode = 'SelfSigned'
@@ -753,6 +756,7 @@ function Update-ReviewSummary {
     [void]$sb.AppendLine("  RemoteApp     : $($script:WizardData.PublishApps)")
     [void]$sb.AppendLine("  Probe REST API: $($script:WizardData.InstallProbeApi)")
     [void]$sb.AppendLine("  Caddy SSL     : $($script:WizardData.InstallCaddySsl)")
+    [void]$sb.AppendLine("  SQL Bridge    : $($script:WizardData.InstallSqlBridge)")
     [void]$sb.AppendLine("  RDP port      : $($script:WizardData.RdpPort)")
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("==== Baglanti Stratejileri ====")
@@ -835,7 +839,10 @@ $btnNext.Enabled = $false
 $btnNext.Add_Click({
     switch ($script:CurrentStep) {
         1 { Set-Step 2 }
-        2 { Set-Step 3 }
+        2 {
+            Update-WizardDataFromStep2
+            Set-Step 3
+        }
         3 {
             if (-not $script:WizardData.RdWebLicenseOk -and -not $chkGuacAuto.Checked) {
                 $script:WizardData.InstallGuacamole = $false
@@ -884,6 +891,7 @@ function New-InstallActions {
     if ($script:WizardData.InstallCloudflare){ [void]$actions.Add(@{ Name='Cloudflare Tunnel kuruluyor'; Script='CloudflareTunnelInstaller.ps1' }) }
     if ($script:WizardData.InstallProbeApi)   { [void]$actions.Add(@{ Name='Probe REST API kuruluyor (8444 + web portali)'; Script='Install-ProbeApiHost.ps1' }) }
     if ($script:WizardData.InstallCaddySsl)   { [void]$actions.Add(@{ Name='Caddy SSL kuruluyor (HTTPS 8445)'; Script='Install-CaddySsl.ps1' }) }
+    if ($script:WizardData.InstallSqlBridge)  { [void]$actions.Add(@{ Name='SQL Bridge etkinlestiriliyor (CONNECT /sql-bridge)'; Script='SqlBridge.ps1'; Args='Install' }) }
     if ($script:WizardData.PublishApps -and $script:WizardData.SelectedApps.Count -gt 0) {
         [void]$actions.Add(@{ Name='RemoteApp koleksiyonu yayinlaniyor'; Script='RemoteAppPublisher.ps1' })
     }
