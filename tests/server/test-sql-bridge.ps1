@@ -66,6 +66,33 @@ Describe 'SqlBridge' {
             $s.tunnelMethod | Should -Be 'CONNECT'
             $s.clientHint | Should -Match '127\.0\.0\.1,'
             $s.connectionString | Should -Match 'Server=127\.0\.0\.1,'
+            $s.probe.port | Should -Be 8444
+            $s.note | Should -Match '1433'
+        }
+    }
+
+    Context 'Get-SqlBridgeEndpointIps' {
+
+        It 'prefers public IP from customers.json when present' {
+            $cfgDir = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config'
+            New-Item -ItemType Directory -Path $cfgDir -Force | Out-Null
+            $customers = [ordered]@{
+                webPort = 8001
+                customers = @(
+                    [ordered]@{
+                        id       = 'default'
+                        name     = 'Varsayilan'
+                        publicIp = '203.0.113.50'
+                        lanIp    = '192.168.1.10'
+                    }
+                )
+            }
+            $customers | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $cfgDir 'customers.json') -Encoding UTF8
+            $eps = Get-SqlBridgeEndpointIps
+            $eps.hasPublicIp | Should -BeTrue
+            $eps.publicIp | Should -Be '203.0.113.50'
+            $eps.preferredHost | Should -Be '203.0.113.50'
+            $eps.lanIp | Should -Be '192.168.1.10'
         }
     }
 

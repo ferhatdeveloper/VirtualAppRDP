@@ -126,15 +126,16 @@ EXFIN RemoteAPP - SQL Bridge
 ============================
 Sunucu SQL'i bu PC'de yerel gibi kullanilir.
 
-SSMS / baglanti dizesi:
+SSMS / baglanti dizesi (HER ZAMAN localhost):
   Server=127.0.0.1,$Port
   Data Source=127.0.0.1,$Port
 
 Ornek:
   Server=127.0.0.1,$Port;Database=YourDb;User Id=...;Password=...;Encrypt=False;
 
-Uzak sunucu: $ServerHost
-Tünel: Probe API CONNECT /sql-bridge (SQL portu internete acilmaz)
+Tünel ucu (sunucu public / WAN IP — Probe API):
+  $ServerHost  (CONNECT /sql-bridge)
+  SQL TCP 1433 internete ACILMAZ; yalnizca Probe portu kullanilir.
 
 Durum:  powershell -File SqlBridgeClient.ps1 -Mode Status
 Durdur: powershell -File SqlBridgeClient.ps1 -Mode Uninstall

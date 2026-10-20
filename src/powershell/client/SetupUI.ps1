@@ -104,7 +104,7 @@ function New-SetupUiStrings {
             RecommendedBadge  = ' (recommended)'
             EmbedWarning      = 'Embedding credentials in RDP files is not secure. Continue?'
             SqlBridgeLabel    = 'SQL Bridge: use server SQL as localhost (SSMS / local apps)'
-            SqlBridgeHint     = 'Listens on 127.0.0.1:1433 and tunnels via Probe API (SQL port stays closed to the internet).'
+            SqlBridgeHint     = 'Local 127.0.0.1:1433 → tunnel to server public IP Probe API (SQL 1433 not exposed).'
         }
     }
 
@@ -161,7 +161,7 @@ function New-SetupUiStrings {
         RecommendedBadge  = ' (önerilen)'
         EmbedWarning      = 'Kimlik bilgisini RDP dosyasına gömmek güvenli değildir. Devam edilsin mi?'
         SqlBridgeLabel    = 'SQL Bridge: sunucu SQL''ini localhost gibi kullan (SSMS / yerel uygulamalar)'
-        SqlBridgeHint     = '127.0.0.1:1433 dinler; Probe API tüneli ile sunucuya iletir (SQL portu internete açılmaz).'
+        SqlBridgeHint     = 'Yerel 127.0.0.1:1433 → sunucu public IP üzerindeki Probe API tüneli (SQL 1433 açılmaz).'
     }
 }
 
@@ -1397,9 +1397,21 @@ function Start-ClientInstall {
                 if ($State.Probe -and $State.Probe.sqlBridge -and $State.Probe.sqlBridge.sqlPort) {
                     try { $localSqlPort = [int]$State.Probe.sqlBridge.sqlPort } catch { $localSqlPort = 1433 }
                 }
+                # Public IP varsa tünel ucu olarak onu kullan (SQL 1433 acilmaz; Probe 8444)
+                $bridgeServer = [string]$State.Server.Ip
+                if ($State.Probe -and $State.Probe.sqlBridge -and $State.Probe.sqlBridge.probe) {
+                    $pb = $State.Probe.sqlBridge.probe
+                    if ($pb.preferredHost) { $bridgeServer = [string]$pb.preferredHost }
+                    if ($pb.port) {
+                        try { $probePort = [int]$pb.port } catch { }
+                    }
+                } elseif ($State.Probe -and $State.Probe.ips -and $State.Probe.ips.public) {
+                    $bridgeServer = [string]$State.Probe.ips.public
+                }
+                Write-SetupLog -Message ("SQL Bridge tünel sunucusu: {0}:{1} (localhost SQL -> Probe CONNECT)" -f $bridgeServer, $probePort)
                 $installArgs = @{
                     Mode      = 'Install'
-                    Server    = [string]$State.Server.Ip
+                    Server    = $bridgeServer
                     ProbePort = $probePort
                     LocalPort = $localSqlPort
                 }

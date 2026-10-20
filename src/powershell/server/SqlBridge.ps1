@@ -75,8 +75,90 @@ function Get-SqlBridgeDefaultConfig {
         sqlPort         = 1433
         requireBearer   = $true
         allowDirectLan  = $false
-        description     = 'Probe API CONNECT /sql-bridge -> yerel SQL. Internet SQL portu acilmaz.'
+        preferPublicIp  = $true
+        probePort       = 8444
+        description     = 'Probe API CONNECT /sql-bridge -> yerel SQL. Public IP uzerinden 8444; SQL 1433 internete acilmaz.'
         updatedAt       = (Get-Date).ToUniversalTime().ToString('o')
+    }
+}
+
+function Get-SqlBridgeEndpointIps {
+    <#
+    .SYNOPSIS
+        Sunucunun kayitli public / LAN IP'lerini customers.json veya client-endpoints.json'dan okur.
+    #>
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param()
+
+    $publicIp = ''
+    $lanIp = ''
+    $vpnIp = ''
+    $probePort = 8444
+
+    $cfgDir = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config'
+    foreach ($name in @('customers.json', 'client-endpoints.json', 'probe-api.json')) {
+        $path = Join-Path $cfgDir $name
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        try {
+            $obj = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+        } catch { continue }
+
+        if ($name -eq 'customers.json') {
+            $list = @()
+            if ($obj.PSObject.Properties['customers'] -and $obj.customers) { $list = @($obj.customers) }
+            $pick = $list | Where-Object {
+                $id = if ($_.PSObject.Properties['id']) { [string]$_.id } else { '' }
+                $id -eq 'default' -or $id -eq 'varsayilan'
+            } | Select-Object -First 1
+            if (-not $pick -and $list.Count -gt 0) { $pick = $list[0] }
+            if ($pick) {
+                if ($pick.PSObject.Properties['publicIp'] -and $pick.publicIp) { $publicIp = [string]$pick.publicIp }
+                if ($pick.PSObject.Properties['lanIp'] -and $pick.lanIp) { $lanIp = [string]$pick.lanIp }
+                if ($pick.PSObject.Properties['vpnIp'] -and $pick.vpnIp) { $vpnIp = [string]$pick.vpnIp }
+            }
+        }
+        elseif ($name -eq 'client-endpoints.json') {
+            if (-not $publicIp -and $obj.PSObject.Properties['public'] -and $obj.public) { $publicIp = [string]$obj.public }
+            if (-not $lanIp -and $obj.PSObject.Properties['lan'] -and $obj.lan) { $lanIp = [string]$obj.lan }
+            if (-not $vpnIp -and $obj.PSObject.Properties['vpn'] -and $obj.vpn) { $vpnIp = [string]$obj.vpn }
+            if ($obj.PSObject.Properties['probe'] -and $obj.probe) {
+                try { $probePort = [int]$obj.probe } catch { }
+            }
+        }
+        elseif ($name -eq 'probe-api.json') {
+            if ($obj.PSObject.Properties['port'] -and $obj.port) {
+                try { $probePort = [int]$obj.port } catch { }
+            }
+        }
+    }
+
+    # Canli tespit (Get-PublicIpv4 ProbeApi'den gelmis olabilir)
+    if ([string]::IsNullOrWhiteSpace($publicIp) -and (Get-Command -Name 'Get-PublicIpv4' -ErrorAction SilentlyContinue)) {
+        try {
+            $detected = Get-PublicIpv4
+            if ($detected) { $publicIp = [string]$detected }
+        } catch { }
+    }
+    if ([string]::IsNullOrWhiteSpace($lanIp) -and (Get-Command -Name 'Get-LocalPrimaryIpv4' -ErrorAction SilentlyContinue)) {
+        try {
+            $lan = Get-LocalPrimaryIpv4
+            if ($lan) { $lanIp = [string]$lan }
+        } catch { }
+    }
+
+    $preferred = ''
+    if (-not [string]::IsNullOrWhiteSpace($publicIp)) { $preferred = $publicIp }
+    elseif (-not [string]::IsNullOrWhiteSpace($lanIp)) { $preferred = $lanIp }
+    elseif (-not [string]::IsNullOrWhiteSpace($vpnIp)) { $preferred = $vpnIp }
+
+    return [ordered]@{
+        publicIp      = $publicIp
+        lanIp         = $lanIp
+        vpnIp         = $vpnIp
+        preferredHost = $preferred
+        probePort     = $probePort
+        hasPublicIp   = (-not [string]::IsNullOrWhiteSpace($publicIp))
     }
 }
 
@@ -229,21 +311,46 @@ function Get-SqlBridgeStatus {
 
     $sqlOk = Test-LocalTcpPortListening -HostName $hostName -Port $port
     $discovery = Find-SqlServerTcpPort
+    $eps = Get-SqlBridgeEndpointIps
+
+    $probePort = 8444
+    try {
+        if ($cfg.probePort) { $probePort = [int]$cfg.probePort }
+        elseif ($eps.probePort) { $probePort = [int]$eps.probePort }
+    } catch { $probePort = 8444 }
+
+    $preferPublic = $true
+    if ($cfg.Contains('preferPublicIp')) { $preferPublic = [bool]$cfg.preferPublicIp }
+    $clientProbeHost = ''
+    if ($preferPublic -and $eps.hasPublicIp) { $clientProbeHost = [string]$eps.publicIp }
+    elseif ($eps.preferredHost) { $clientProbeHost = [string]$eps.preferredHost }
 
     return [ordered]@{
-        enabled         = [bool]$cfg.enabled
-        sqlHost         = $hostName
-        sqlPort         = $port
-        sqlReachable    = [bool]$sqlOk
-        requireBearer   = [bool]$cfg.requireBearer
-        allowDirectLan  = [bool]$cfg.allowDirectLan
-        tunnelPath      = '/sql-bridge'
-        tunnelMethod    = 'CONNECT'
-        clientHint      = '127.0.0.1,{0}' -f $port
+        enabled          = [bool]$cfg.enabled
+        sqlHost          = $hostName
+        sqlPort          = $port
+        sqlReachable     = [bool]$sqlOk
+        requireBearer    = [bool]$cfg.requireBearer
+        allowDirectLan   = [bool]$cfg.allowDirectLan
+        preferPublicIp   = $preferPublic
+        tunnelPath       = '/sql-bridge'
+        tunnelMethod     = 'CONNECT'
+        # Istemci SSMS tarafi her zaman localhost; tünel ucu public/LAN Probe API
+        clientHint       = '127.0.0.1,{0}' -f $port
         connectionString = 'Server=127.0.0.1,{0};Trusted_Connection=False;Encrypt=False;' -f $port
-        discovery       = $discovery
-        configPath      = (Get-SqlBridgeConfigPath)
-        updatedAt       = [string]$cfg.updatedAt
+        probe = [ordered]@{
+            port          = $probePort
+            publicHost    = [string]$eps.publicIp
+            lanHost       = [string]$eps.lanIp
+            vpnHost       = [string]$eps.vpnIp
+            preferredHost = $clientProbeHost
+            hasPublicIp   = [bool]$eps.hasPublicIp
+            connectHint   = $(if ($clientProbeHost) { "CONNECT http://${clientProbeHost}:${probePort}/sql-bridge" } else { 'CONNECT /sql-bridge (istemci sunucu IP girer)' })
+        }
+        discovery        = $discovery
+        configPath       = (Get-SqlBridgeConfigPath)
+        updatedAt        = [string]$cfg.updatedAt
+        note             = 'SQL TCP (1433) internete acilmaz. Public IP yalnizca Probe API (8444) tüneli icindir.'
     }
 }
 
@@ -276,6 +383,15 @@ function Install-SqlBridge {
     $cfg.enabled = $true
     $cfg.requireBearer = $true
     $cfg.allowDirectLan = $false
+    $cfg.preferPublicIp = $true
+
+    $eps = Get-SqlBridgeEndpointIps
+    if ($eps.probePort -ge 1) { $cfg.probePort = [int]$eps.probePort }
+    if ($eps.hasPublicIp) {
+        Write-SqlBridgeLog -Message ("Public IP bulundu; istemci tüneli bu adrese yonlendirilecek: {0}:{1}" -f $eps.publicIp, $cfg.probePort)
+    } else {
+        Write-SqlBridgeLog -Level WARN -Message 'Public IP kaydi yok (customers.json / client-endpoints.json). Istemci sihirbazindaki sunucu IP kullanilir.'
+    }
 
     # SQL TCP etkinlestirme (opsiyonel): yalnizca registry bayragi; SQL restart istemezsek
     # sadece mevcut dinleyen portu kullaniriz. EnableTcpIfNeeded ile TCP/IP Enabled=1 yazilir.

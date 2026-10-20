@@ -5,5 +5,7 @@
   "sqlPort": 1433,
   "requireBearer": true,
   "allowDirectLan": false,
-  "description": "Probe API CONNECT /sql-bridge tuneli ile istemci localhost:1433 -> sunucu SQL. SQL TCP portu internete acilmaz."
+  "preferPublicIp": true,
+  "probePort": 8444,
+  "description": "Istemci 127.0.0.1:1433 -> sunucu public IP Probe CONNECT /sql-bridge. SQL 1433 internete acilmaz; public IP yalnizca 8444 tüneli icindir."
 }

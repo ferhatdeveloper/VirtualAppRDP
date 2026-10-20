@@ -4,20 +4,22 @@ RemoteApp ile uygulamayı sunucuda çalıştırmak yerine (veya yanında), istem
 
 ## Nasıl çalışır?
 
+Sunucuda zaten **public IP** varsa (portal / `customers.json` / `client-endpoints.json`) istemci tüneli bu adrese kurulur. SQL portu public’e açılmaz.
+
 ```
 [SSMS / yerel uygulama]
-        │  Server=127.0.0.1,1433
+        │  Server=127.0.0.1,1433   ← her zaman localhost
         ▼
-[İstemci SqlBridgeClient] ── Probe API CONNECT /sql-bridge (TCP 8444 + Bearer) ──► [Sunucu]
-                                                                                      │
-                                                                                      ▼
-                                                                            127.0.0.1:<sqlPort>
-                                                                            (SQL Server)
+[İstemci SqlBridgeClient]
+        │  CONNECT /sql-bridge
+        │  → http://<PUBLIC_IP>:8444   ← sunucunun kayıtlı public IP’si
+        ▼
+[Sunucu Probe API] ──► 127.0.0.1:<sqlPort> (SQL Server)
 ```
 
-- SQL TCP portu (**1433**) internete **açılmaz**.
-- Tünel mevcut Probe REST API portu üzerinden gider; kimlik doğrulama Bearer token ile yapılır.
-- İstemci tarafında bağlantı dizesi: `Server=127.0.0.1,1433`
+- SQL TCP (**1433**) internete **açılmaz**.
+- Public IP yalnızca **Probe API 8444** (tünel) içindir — RDP/public portal ile aynı adres.
+- SSMS bağlantı dizesi her zaman: `Server=127.0.0.1,1433`
 
 ## Sunucu kurulumu
 
@@ -67,12 +69,25 @@ Kurulum sonrası:
 2. SSMS → Connect → Server name: `127.0.0.1,1433`
 3. SQL kimlik bilgisi / Windows auth (sunucu SQL’inin kabul ettiği yöntem).
 
+## Public IP
+
+Kurulum zaten public IP’yi `customers.json` / `client-endpoints.json` içine yazar. SQL Bridge Install bu kaydı okur:
+
+```powershell
+.\SqlBridge.ps1 -Mode Status
+# probe.publicHost / probe.preferredHost / probe.hasPublicIp
+```
+
+İstemci sihirbazı SQL Bridge kurarken `preferredHost` (public IP) varsa onu kullanır; yoksa sihirbaza girilen sunucu IP’sine düşer.
+
+Firewall / NAT: **TCP 8444** (ve isteğe bağlı 8445) public IP’ye yönlendirilmiş olmalı. **1433 yönlendirmeyin.**
+
 ## Güvenlik
 
 - İnternete SQL portu açılmaz; sadece Probe API (8444) + Bearer token.
 - Token’ı istemciye güvenli dağıtın (`probe-api.json` / kurulum sihirbazı).
-- Üretimde Caddy HTTPS (8445) veya VPN (Tailscale) ile Probe erişimini kısıtlayın.
-- `allowDirectLan` varsayılan **kapalı**dır (doğrudan 1433 yayınlanmaz).
+- Üretimde Caddy HTTPS (8445) veya IP kısıtı ile Probe erişimini daraltın.
+- `allowDirectLan` / doğrudan 1433 varsayılan **kapalı**dır.
 
 ## Sorun giderme
 
