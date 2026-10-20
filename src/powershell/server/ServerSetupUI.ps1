@@ -463,7 +463,7 @@ $chkCf = New-Object System.Windows.Forms.CheckBox; $chkCf.Text = "Cloudflare Tun
 $chkAp = New-Object System.Windows.Forms.CheckBox; $chkAp.Text = "App Kutuphanesi (RemoteApp yayinlama)";        $chkAp.Checked = $true;  $chkAp.Location = New-Object System.Drawing.Point(15, 142); $chkAp.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkAp)
 $chkPa = New-Object System.Windows.Forms.CheckBox; $chkPa.Text = "Probe REST API (port 8444, macOS / HTTP istemcileri)"; $chkPa.Checked = $true; $chkPa.Location = New-Object System.Drawing.Point(15, 166); $chkPa.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkPa)
 $chkCy = New-Object System.Windows.Forms.CheckBox; $chkCy.Text = "Caddy SSL (HTTPS 8445, Probe API reverse proxy)"; $chkCy.Checked = $true; $chkCy.Location = New-Object System.Drawing.Point(15, 190); $chkCy.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkCy)
-$chkSql = New-Object System.Windows.Forms.CheckBox; $chkSql.Text = "SQL Bridge (istemci localhost:1433 -> public IP Probe 8444 CONNECT; SQL 1433 acilmaz)"; $chkSql.Checked = $false; $chkSql.Location = New-Object System.Drawing.Point(15, 214); $chkSql.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkSql)
+$chkSql = New-Object System.Windows.Forms.CheckBox; $chkSql.Text = "SQL Bridge (istemci localhost:1433; tünel: sunucu adi VEYA public IP -> Probe 8444; SQL 1433 acilmaz)"; $chkSql.Checked = $false; $chkSql.Location = New-Object System.Drawing.Point(15, 214); $chkSql.Size = New-Object System.Drawing.Size(810, 22); $gbOther.Controls.Add($chkSql)
 
 # Checkbox/radio state'leri Next handler'inda senkron olarak WizardData'ya yazilir
 # (parser-friendly: event handler baglama yerine snapshot okuma).

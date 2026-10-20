@@ -60,7 +60,7 @@ function New-SetupUiStrings {
             Step2Title        = 'Server probe results'
             Step3Title        = 'Application and access type'
             Step4Title        = 'Review and install'
-            ServerIpLabel     = 'Server IP:'
+            ServerIpLabel     = 'Server name or public IP:'
             PortLabel         = 'Port:'
             UsernameLabel     = 'Username (domain\user):'
             PasswordLabel     = 'Password:'
@@ -104,7 +104,7 @@ function New-SetupUiStrings {
             RecommendedBadge  = ' (recommended)'
             EmbedWarning      = 'Embedding credentials in RDP files is not secure. Continue?'
             SqlBridgeLabel    = 'SQL Bridge: use server SQL as localhost (SSMS / local apps)'
-            SqlBridgeHint     = 'Local 127.0.0.1:1433 → tunnel to server public IP Probe API (SQL 1433 not exposed).'
+            SqlBridgeHint     = 'Local 127.0.0.1:1433 → Probe tunnel via the server name or public IP you entered (SQL 1433 not exposed).'
         }
     }
 
@@ -117,7 +117,7 @@ function New-SetupUiStrings {
         Step2Title        = 'Sunucu tespit sonuçları'
         Step3Title        = 'Uygulama ve erişim tipi'
         Step4Title        = 'İnceleme ve kurulum'
-        ServerIpLabel     = 'Sunucu IP:'
+        ServerIpLabel     = 'Sunucu adı veya public IP:'
         PortLabel         = 'Port:'
         UsernameLabel     = 'Kullanıcı adı (domain\user):'
         PasswordLabel     = 'Parola:'
@@ -161,7 +161,7 @@ function New-SetupUiStrings {
         RecommendedBadge  = ' (önerilen)'
         EmbedWarning      = 'Kimlik bilgisini RDP dosyasına gömmek güvenli değildir. Devam edilsin mi?'
         SqlBridgeLabel    = 'SQL Bridge: sunucu SQL''ini localhost gibi kullan (SSMS / yerel uygulamalar)'
-        SqlBridgeHint     = 'Yerel 127.0.0.1:1433 → sunucu public IP üzerindeki Probe API tüneli (SQL 1433 açılmaz).'
+        SqlBridgeHint     = 'Yerel 127.0.0.1:1433 → girdiginiz sunucu adı veya public IP üzerinden Probe tüneli (SQL 1433 açılmaz).'
     }
 }
 
@@ -1397,18 +1397,12 @@ function Start-ClientInstall {
                 if ($State.Probe -and $State.Probe.sqlBridge -and $State.Probe.sqlBridge.sqlPort) {
                     try { $localSqlPort = [int]$State.Probe.sqlBridge.sqlPort } catch { $localSqlPort = 1433 }
                 }
-                # Public IP varsa tünel ucu olarak onu kullan (SQL 1433 acilmaz; Probe 8444)
+                # Kullanicinin girdigi sunucu adi VEYA public IP aynen kullanilir (zorla public'e cevirme).
                 $bridgeServer = [string]$State.Server.Ip
-                if ($State.Probe -and $State.Probe.sqlBridge -and $State.Probe.sqlBridge.probe) {
-                    $pb = $State.Probe.sqlBridge.probe
-                    if ($pb.preferredHost) { $bridgeServer = [string]$pb.preferredHost }
-                    if ($pb.port) {
-                        try { $probePort = [int]$pb.port } catch { }
-                    }
-                } elseif ($State.Probe -and $State.Probe.ips -and $State.Probe.ips.public) {
-                    $bridgeServer = [string]$State.Probe.ips.public
+                if ($State.Probe -and $State.Probe.sqlBridge -and $State.Probe.sqlBridge.probe -and $State.Probe.sqlBridge.probe.port) {
+                    try { $probePort = [int]$State.Probe.sqlBridge.probe.port } catch { }
                 }
-                Write-SetupLog -Message ("SQL Bridge tünel sunucusu: {0}:{1} (localhost SQL -> Probe CONNECT)" -f $bridgeServer, $probePort)
+                Write-SetupLog -Message ("SQL Bridge tünel sunucusu: {0}:{1} (sunucu adi veya public IP; localhost SQL -> Probe CONNECT)" -f $bridgeServer, $probePort)
                 $installArgs = @{
                     Mode      = 'Install'
                     Server    = $bridgeServer

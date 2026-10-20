@@ -73,7 +73,7 @@ Describe 'SqlBridge' {
 
     Context 'Get-SqlBridgeEndpointIps' {
 
-        It 'prefers public IP from customers.json when present' {
+        It 'lists public IP and accepts server name or IP as tunnel hosts' {
             $cfgDir = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config'
             New-Item -ItemType Directory -Path $cfgDir -Force | Out-Null
             $customers = [ordered]@{
@@ -84,6 +84,8 @@ Describe 'SqlBridge' {
                         name     = 'Varsayilan'
                         publicIp = '203.0.113.50'
                         lanIp    = '192.168.1.10'
+                        hostname = 'SUNUCU01'
+                        fqdn     = 'rdp.firma.local'
                     }
                 )
             }
@@ -93,6 +95,9 @@ Describe 'SqlBridge' {
             $eps.publicIp | Should -Be '203.0.113.50'
             $eps.preferredHost | Should -Be '203.0.113.50'
             $eps.lanIp | Should -Be '192.168.1.10'
+            $eps.acceptHosts | Should -Contain '203.0.113.50'
+            $eps.acceptHosts | Should -Contain 'SUNUCU01'
+            $eps.acceptHosts | Should -Contain 'rdp.firma.local'
         }
     }
 

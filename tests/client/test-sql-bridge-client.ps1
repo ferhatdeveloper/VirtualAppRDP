@@ -115,5 +115,7 @@ Describe 'SetupUI SQL Bridge strings' {
         $tr.SqlBridgeLabel | Should -Match 'SQL Bridge'
         $en.SqlBridgeLabel | Should -Match 'SQL Bridge'
         $tr.SqlBridgeHint  | Should -Match '127\.0\.0\.1'
+        $tr.ServerIpLabel  | Should -Match 'Sunucu adı veya public IP'
+        $en.ServerIpLabel  | Should -Match 'Server name or public IP'
     }
 }

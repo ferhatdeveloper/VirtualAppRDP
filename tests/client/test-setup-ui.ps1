@@ -49,13 +49,13 @@ Describe 'SetupUI helpers' {
         It 'should return the Turkish default when no language is supplied' {
             $s = New-SetupUiStrings
             $s.FormTitle | Should -Be 'Rdp Virtual Box App - Kurulum'
-            $s.ServerIpLabel | Should -Be 'Sunucu IP:'
+            $s.ServerIpLabel | Should -Be 'Sunucu adı veya public IP:'
         }
 
         It 'should return the English bundle when -Language en is supplied' {
             $s = New-SetupUiStrings -Language en
             $s.FormTitle | Should -Be 'Rdp Virtual Box App - Setup'
-            $s.ServerIpLabel | Should -Be 'Server IP:'
+            $s.ServerIpLabel | Should -Be 'Server name or public IP:'
         }
 
         It 'should fail validation when an unknown language is supplied' {

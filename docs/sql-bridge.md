@@ -4,7 +4,7 @@ RemoteApp ile uygulamayı sunucuda çalıştırmak yerine (veya yanında), istem
 
 ## Nasıl çalışır?
 
-Sunucuda zaten **public IP** varsa (portal / `customers.json` / `client-endpoints.json`) istemci tüneli bu adrese kurulur. SQL portu public’e açılmaz.
+İstemci sihirbazına **sunucu adı** veya **public IP** yazılabilir; ikisi de Probe tüneline gider. SQL portu internete açılmaz.
 
 ```
 [SSMS / yerel uygulama]
@@ -12,13 +12,14 @@ Sunucuda zaten **public IP** varsa (portal / `customers.json` / `client-endpoint
         ▼
 [İstemci SqlBridgeClient]
         │  CONNECT /sql-bridge
-        │  → http://<PUBLIC_IP>:8444   ← sunucunun kayıtlı public IP’si
+        │  → http://<SUNUCU_ADI|PUBLIC_IP>:8444
+        │     örn. SUNUCU01  /  rdp.firma.local  /  203.0.113.50
         ▼
 [Sunucu Probe API] ──► 127.0.0.1:<sqlPort> (SQL Server)
 ```
 
 - SQL TCP (**1433**) internete **açılmaz**.
-- Public IP yalnızca **Probe API 8444** (tünel) içindir — RDP/public portal ile aynı adres.
+- Tünel ucu: hostname, FQDN veya public IP — hangisini yazarsanız.
 - SSMS bağlantı dizesi her zaman: `Server=127.0.0.1,1433`
 
 ## Sunucu kurulumu
@@ -52,7 +53,12 @@ Client sihirbazı adım 3’te:
 veya:
 
 ```powershell
-.\SqlBridgeClient.ps1 -Mode Install -Server 10.0.0.10 -ProbePort 8444 -Token '<probe-token>'
+# Public IP ile
+.\SqlBridgeClient.ps1 -Mode Install -Server 203.0.113.50 -ProbePort 8444 -Token '<probe-token>'
+
+# Sunucu adi / FQDN ile (ayni sekilde calisir)
+.\SqlBridgeClient.ps1 -Mode Install -Server rdp.firma.local -ProbePort 8444 -Token '<probe-token>'
+.\SqlBridgeClient.ps1 -Mode Install -Server SUNUCU01 -ProbePort 8444 -Token '<probe-token>'
 ```
 
 Kurulum sonrası:
@@ -69,18 +75,24 @@ Kurulum sonrası:
 2. SSMS → Connect → Server name: `127.0.0.1,1433`
 3. SQL kimlik bilgisi / Windows auth (sunucu SQL’inin kabul ettiği yöntem).
 
-## Public IP
+## Sunucu adı veya public IP
 
-Kurulum zaten public IP’yi `customers.json` / `client-endpoints.json` içine yazar. SQL Bridge Install bu kaydı okur:
+İstemci adım 1’de ne yazdıysanız tünel onu kullanır:
+
+| Giriş | Örnek |
+|---|---|
+| Sunucu adı (NetBIOS) | `SUNUCU01` |
+| FQDN | `rdp.firma.local` |
+| Public IP | `203.0.113.50` |
+
+Sunucu tarafı durum çıktısı kabul edilen host’ları listeler:
 
 ```powershell
 .\SqlBridge.ps1 -Mode Status
-# probe.publicHost / probe.preferredHost / probe.hasPublicIp
+# probe.acceptHosts / probe.serverName / probe.publicHost / probe.examples
 ```
 
-İstemci sihirbazı SQL Bridge kurarken `preferredHost` (public IP) varsa onu kullanır; yoksa sihirbaza girilen sunucu IP’sine düşer.
-
-Firewall / NAT: **TCP 8444** (ve isteğe bağlı 8445) public IP’ye yönlendirilmiş olmalı. **1433 yönlendirmeyin.**
+Firewall / NAT (WAN için): **TCP 8444** public IP’ye yönlendirilmiş olmalı. **1433 yönlendirmeyin.** DNS ile sunucu adı kullanıyorsanız A kaydı Probe’un dinlediği adrese işaret etmeli.
 
 ## Güvenlik
 

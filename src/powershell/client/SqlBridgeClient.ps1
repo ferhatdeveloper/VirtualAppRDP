@@ -133,8 +133,9 @@ SSMS / baglanti dizesi (HER ZAMAN localhost):
 Ornek:
   Server=127.0.0.1,$Port;Database=YourDb;User Id=...;Password=...;Encrypt=False;
 
-Tünel ucu (sunucu public / WAN IP — Probe API):
+Tünel ucu (sunucu adi VEYA public IP — Probe API):
   $ServerHost  (CONNECT /sql-bridge)
+  Ornek: SUNUCU01  |  rdp.firma.local  |  203.0.113.50
   SQL TCP 1433 internete ACILMAZ; yalnizca Probe portu kullanilir.
 
 Durum:  powershell -File SqlBridgeClient.ps1 -Mode Status

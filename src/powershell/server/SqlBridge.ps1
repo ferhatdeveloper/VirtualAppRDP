@@ -85,7 +85,8 @@ function Get-SqlBridgeDefaultConfig {
 function Get-SqlBridgeEndpointIps {
     <#
     .SYNOPSIS
-        Sunucunun kayitli public / LAN IP'lerini customers.json veya client-endpoints.json'dan okur.
+        Sunucu adi (hostname/FQDN) + public / LAN IP'lerini okur.
+        Istemci tüneli icin bunlardan HERHANGI BIRI yazilabilir.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -94,7 +95,23 @@ function Get-SqlBridgeEndpointIps {
     $publicIp = ''
     $lanIp = ''
     $vpnIp = ''
+    $serverName = $env:COMPUTERNAME
+    $fqdn = ''
     $probePort = 8444
+
+    try {
+        $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        if ($cs.DNSHostName) { $serverName = [string]$cs.DNSHostName }
+        if ($cs.Domain -and $cs.Domain -ne 'WORKGROUP' -and $serverName -notlike "*.*") {
+            $fqdn = '{0}.{1}' -f $serverName, $cs.Domain
+        } elseif ($serverName -like '*.*') {
+            $fqdn = $serverName
+        }
+    } catch {
+        try {
+            $fqdn = [System.Net.Dns]::GetHostEntry('localhost').HostName
+        } catch { }
+    }
 
     $cfgDir = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config'
     foreach ($name in @('customers.json', 'client-endpoints.json', 'probe-api.json')) {
@@ -116,12 +133,16 @@ function Get-SqlBridgeEndpointIps {
                 if ($pick.PSObject.Properties['publicIp'] -and $pick.publicIp) { $publicIp = [string]$pick.publicIp }
                 if ($pick.PSObject.Properties['lanIp'] -and $pick.lanIp) { $lanIp = [string]$pick.lanIp }
                 if ($pick.PSObject.Properties['vpnIp'] -and $pick.vpnIp) { $vpnIp = [string]$pick.vpnIp }
+                if ($pick.PSObject.Properties['hostname'] -and $pick.hostname) { $serverName = [string]$pick.hostname }
+                if ($pick.PSObject.Properties['fqdn'] -and $pick.fqdn) { $fqdn = [string]$pick.fqdn }
             }
         }
         elseif ($name -eq 'client-endpoints.json') {
             if (-not $publicIp -and $obj.PSObject.Properties['public'] -and $obj.public) { $publicIp = [string]$obj.public }
             if (-not $lanIp -and $obj.PSObject.Properties['lan'] -and $obj.lan) { $lanIp = [string]$obj.lan }
             if (-not $vpnIp -and $obj.PSObject.Properties['vpn'] -and $obj.vpn) { $vpnIp = [string]$obj.vpn }
+            if ($obj.PSObject.Properties['hostname'] -and $obj.hostname) { $serverName = [string]$obj.hostname }
+            if ($obj.PSObject.Properties['fqdn'] -and $obj.fqdn) { $fqdn = [string]$obj.fqdn }
             if ($obj.PSObject.Properties['probe'] -and $obj.probe) {
                 try { $probePort = [int]$obj.probe } catch { }
             }
@@ -147,18 +168,32 @@ function Get-SqlBridgeEndpointIps {
         } catch { }
     }
 
+    # Istemci bunlardan herhangi birini yazabilir
+    $acceptHosts = New-Object System.Collections.Generic.List[string]
+    foreach ($h in @($serverName, $fqdn, $publicIp, $lanIp, $vpnIp)) {
+        if ([string]::IsNullOrWhiteSpace($h)) { continue }
+        $t = $h.Trim()
+        if (-not $acceptHosts.Contains($t)) { [void]$acceptHosts.Add($t) }
+    }
+
     $preferred = ''
     if (-not [string]::IsNullOrWhiteSpace($publicIp)) { $preferred = $publicIp }
+    elseif (-not [string]::IsNullOrWhiteSpace($fqdn)) { $preferred = $fqdn }
+    elseif (-not [string]::IsNullOrWhiteSpace($serverName)) { $preferred = $serverName }
     elseif (-not [string]::IsNullOrWhiteSpace($lanIp)) { $preferred = $lanIp }
     elseif (-not [string]::IsNullOrWhiteSpace($vpnIp)) { $preferred = $vpnIp }
 
     return [ordered]@{
+        serverName    = $serverName
+        fqdn          = $fqdn
         publicIp      = $publicIp
         lanIp         = $lanIp
         vpnIp         = $vpnIp
+        acceptHosts   = @($acceptHosts.ToArray())
         preferredHost = $preferred
         probePort     = $probePort
         hasPublicIp   = (-not [string]::IsNullOrWhiteSpace($publicIp))
+        hasServerName = (-not [string]::IsNullOrWhiteSpace($serverName))
     }
 }
 
@@ -340,12 +375,21 @@ function Get-SqlBridgeStatus {
         connectionString = 'Server=127.0.0.1,{0};Trusted_Connection=False;Encrypt=False;' -f $port
         probe = [ordered]@{
             port          = $probePort
+            serverName    = [string]$eps.serverName
+            fqdn          = [string]$eps.fqdn
             publicHost    = [string]$eps.publicIp
             lanHost       = [string]$eps.lanIp
             vpnHost       = [string]$eps.vpnIp
+            acceptHosts   = @($eps.acceptHosts)
             preferredHost = $clientProbeHost
             hasPublicIp   = [bool]$eps.hasPublicIp
-            connectHint   = $(if ($clientProbeHost) { "CONNECT http://${clientProbeHost}:${probePort}/sql-bridge" } else { 'CONNECT /sql-bridge (istemci sunucu IP girer)' })
+            hasServerName = [bool]$eps.hasServerName
+            connectHint   = 'Istemci sihirbazina sunucu adi VEYA public IP yazin; CONNECT /sql-bridge ayni Probe portuna gider.'
+            examples      = @(
+                $(if ($eps.serverName) { "{0}:{1}" -f $eps.serverName, $probePort } else { $null })
+                $(if ($eps.fqdn) { "{0}:{1}" -f $eps.fqdn, $probePort } else { $null })
+                $(if ($eps.publicIp) { "{0}:{1}" -f $eps.publicIp, $probePort } else { $null })
+            ) | Where-Object { $_ }
         }
         discovery        = $discovery
         configPath       = (Get-SqlBridgeConfigPath)
