@@ -145,6 +145,11 @@ Describe 'ProbeApi sql-bridge route' {
         $paths = @($cat.endpoints | ForEach-Object { $_.path })
         $paths | Should -Contain '/api/sql-bridge'
         $paths | Should -Contain '/sql-bridge'
+        $paths | Should -Contain '/sql-bridge.cer'
+    }
+
+    It 'treats /sql-bridge.cer as anonymous' {
+        Test-ProbeApiAnonymousPath -Path '/sql-bridge.cer' | Should -BeTrue
     }
 
     It 'serves /api/sql-bridge with bearer when token configured' {

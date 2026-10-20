@@ -11,7 +11,7 @@ Versiyonlama [Semantic Versioning](https://semver.org/) kurallarına uyar.
 
 ### Eklenenler (Added)
 
-- **SQL Bridge** — Sunucu SQL’ini istemcide `localhost` gibi kullanma. Probe API `CONNECT /sql-bridge` tüneli (Bearer); SQL 1433 internete açılmaz. Tünel ucu: istemcinin yazdığı **sunucu adı veya public IP** (FQDN / NetBIOS / WAN IP). Sunucu: `SqlBridge.ps1`, istemci: `SqlBridgeClient.ps1` + sihirbaz kutusu. SSMS: `Server=127.0.0.1,1433`. Kilavuz: [docs/sql-bridge.md](docs/sql-bridge.md).
+- **SQL Bridge** — Sunucu SQL’ini istemcide `localhost` gibi kullanma. Probe API `CONNECT /sql-bridge` tüneli (Bearer); SQL 1433 internete açılmaz. Tünel ucu: istemcinin yazdığı **sunucu adı veya public IP**. Kurulumda **otomatik TLS** (self-signed SAN + Root trust + `/sql-bridge.cer` + Caddy 8445); istemci sertifikayı indirip güvenilen köke ekler. Kilavuz: [docs/sql-bridge.md](docs/sql-bridge.md).
 - **Web RDP / Gateway** — Genel kullanici sayfasi `GET /web` (Direct .rdp, RD Gateway .rdp, tarayici HTML5). Panelde baglanti modu: Direct, RD Gateway (TCP 443), Web. Durum `GET /api/web`. HTML5 icin RD Web Client veya Guacamole 8443 gerekir.
 - **Android Gateway / Web** — Istemci `RD Gateway (443)` `.rdp` ve `Web (tarayici)` HTML5 yolunu listeler. WAN icin Gateway onerilir; sertifika `/gateway.cer`. GHA APK `sideload.jks` ile v1/v2/v3 imzalanir; imzasiz APK Android'de yuklenmez. Android `.rdp` RemoteApp (`remoteapplicationmode:i:1` + EXE kabugu); tam masaustu oturumu acilmaz.
 - **RD Web feed (workgroup)** — `Publish-RdWebFeed.ps1` HTML5 katalogunu yerel Session Host `TSAppAllowList` uygulamalarina baglar (`ws08r2rdserver`). Domain koleksiyonu olmadan Tiger3Ent RD Web Client'ta gorunur.

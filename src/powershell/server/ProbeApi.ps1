@@ -1530,6 +1530,7 @@ function Get-ProbeCatalog {
             [ordered]@{ method = 'GET';  path = '/api/sql-bridge';      auth = $true;  description = 'SQL Bridge status (localhost tunnel)' }
             [ordered]@{ method = 'GET';  path = '/probe/api/sql-bridge'; auth = $true;  description = 'SQL Bridge status (alias)' }
             [ordered]@{ method = 'CONNECT'; path = '/sql-bridge';     auth = $true;  description = 'Raw TCP tunnel to local SQL' }
+            [ordered]@{ method = 'GET';  path = '/sql-bridge.cer';     auth = $false; description = 'Auto TLS cert for SQL Bridge / HTTPS trust' }
             [ordered]@{ method = 'GET';  path = '/download';            auth = $false; description = 'React RemoteApp dashboard' }
             [ordered]@{ method = 'GET'; path = '/rdp';                 auth = $false; description = 'Indirilebilir .rdp listesi' }
             [ordered]@{ method = 'GET'; path = '/rdp/public.rdp';      auth = $false; description = 'Public IP RemoteApp .rdp' }
@@ -2055,7 +2056,7 @@ function Test-ProbeApiAnonymousPath {
     $p = $Path.ToLowerInvariant().TrimEnd('/')
     if ([string]::IsNullOrWhiteSpace($p)) { $p = '/' }
     if ($p -eq '/' -or $p -eq '/health' -or $p -eq '/api/health' -or $p -eq '/probe/api/health') { return $true }
-    if ($p -eq '/download' -or $p -eq '/web' -or $p -eq '/rdp' -or $p -eq '/api/portal' -or $p -eq '/api/apps' -or $p -eq '/api/web' -or $p -eq '/app' -or $p -eq '/dashboard' -or $p -eq '/index.html' -or $p -eq '/api/icon' -or $p -eq '/gateway.cer') { return $true }
+    if ($p -eq '/download' -or $p -eq '/web' -or $p -eq '/rdp' -or $p -eq '/api/portal' -or $p -eq '/api/apps' -or $p -eq '/api/web' -or $p -eq '/app' -or $p -eq '/dashboard' -or $p -eq '/index.html' -or $p -eq '/api/icon' -or $p -eq '/gateway.cer' -or $p -eq '/sql-bridge.cer') { return $true }
     if ($p.StartsWith('/rdp/')) { return $true }
     if ($p.StartsWith('/assets/')) { return $true }
     return $false
@@ -2276,6 +2277,40 @@ function Invoke-ProbeApiRequest {
             return New-ProbeApiHttpResponse -Body $cer -ContentType 'application/x-x509-ca-cert' -Headers @{
                 'Content-Disposition' = 'attachment; filename="EXFIN-RD-Gateway.cer"'
                 'Cache-Control' = 'no-store'
+            }
+        }
+        '/sql-bridge.cer'       {
+            $cerPath = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config\EXFIN-SqlBridge.cer'
+            if (-not (Test-Path -LiteralPath $cerPath)) {
+                $cerPath = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config\EXFIN-RD-Gateway.cer'
+            }
+            if (-not (Test-Path -LiteralPath $cerPath)) {
+                $cer = Get-ExfinGatewayCerPem
+                if (-not $cer) {
+                    return New-ProbeApiHttpResponse -Status 404 -Body @{ error = 'sql_bridge_cert_missing'; hint = 'SqlBridge.ps1 -Mode Install veya CertificateManager auto TLS' }
+                }
+                return New-ProbeApiHttpResponse -Body $cer -ContentType 'application/x-x509-ca-cert' -Headers @{
+                    'Content-Disposition' = 'attachment; filename="EXFIN-SqlBridge.cer"'
+                    'Cache-Control' = 'no-store'
+                }
+            }
+            try {
+                $bytes = [System.IO.File]::ReadAllBytes($cerPath)
+                $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+                if ($ascii.Contains('BEGIN CERTIFICATE')) {
+                    return New-ProbeApiHttpResponse -Body $ascii -ContentType 'application/x-x509-ca-cert' -Headers @{
+                        'Content-Disposition' = 'attachment; filename="EXFIN-SqlBridge.cer"'
+                        'Cache-Control' = 'no-store'
+                    }
+                }
+                $b64 = [Convert]::ToBase64String($bytes, [System.Base64FormattingOptions]::InsertLineBreaks)
+                $pem = '-----BEGIN CERTIFICATE-----' + [Environment]::NewLine + $b64 + [Environment]::NewLine + '-----END CERTIFICATE-----' + [Environment]::NewLine
+                return New-ProbeApiHttpResponse -Body $pem -ContentType 'application/x-x509-ca-cert' -Headers @{
+                    'Content-Disposition' = 'attachment; filename="EXFIN-SqlBridge.cer"'
+                    'Cache-Control' = 'no-store'
+                }
+            } catch {
+                return New-ProbeApiHttpResponse -Status 500 -Body @{ error = 'cert_read_failed'; message = $_.Exception.Message }
             }
         }
         '/api/web'              {

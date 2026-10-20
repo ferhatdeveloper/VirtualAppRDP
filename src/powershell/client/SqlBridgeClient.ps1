@@ -137,6 +137,7 @@ Tünel ucu (sunucu adi VEYA public IP — Probe API):
   $ServerHost  (CONNECT /sql-bridge)
   Ornek: SUNUCU01  |  rdp.firma.local  |  203.0.113.50
   SQL TCP 1433 internete ACILMAZ; yalnizca Probe portu kullanilir.
+  Sertifika: kurulum /sql-bridge.cer indirip otomatik guvenir.
 
 Durum:  powershell -File SqlBridgeClient.ps1 -Mode Status
 Durdur: powershell -File SqlBridgeClient.ps1 -Mode Uninstall
@@ -280,6 +281,44 @@ function Start-SqlBridgeClientListen {
     }
 }
 
+function Install-SqlBridgeClientCertificate {
+    <#
+    .SYNOPSIS
+        Sunucudan /sql-bridge.cer (veya /gateway.cer) indirir ve CurrentUser\Root'a guvenir.
+    #>
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(Mandatory)][string]$ServerHost,
+        [int]$ProbeApiPort = 8444
+    )
+
+    $cerDir = Join-Path $env:LOCALAPPDATA 'RdpVirtualBoxApp\Config'
+    if (-not (Test-Path -LiteralPath $cerDir)) {
+        New-Item -ItemType Directory -Path $cerDir -Force | Out-Null
+    }
+    $cerFile = Join-Path $cerDir 'EXFIN-SqlBridge.cer'
+    $ok = $false
+    $err = ''
+    foreach ($path in @('/sql-bridge.cer', '/gateway.cer')) {
+        $uri = 'http://{0}:{1}{2}' -f $ServerHost, $ProbeApiPort, $path
+        try {
+            Write-SqlBridgeClientLog -Message "Sertifika indiriliyor: $uri"
+            Invoke-WebRequest -Uri $uri -OutFile $cerFile -UseBasicParsing -TimeoutSec 15
+            if ((Test-Path -LiteralPath $cerFile) -and ((Get-Item -LiteralPath $cerFile).Length -gt 32)) {
+                Import-Certificate -FilePath $cerFile -CertStoreLocation 'Cert:\CurrentUser\Root' -ErrorAction Stop | Out-Null
+                Write-SqlBridgeClientLog -Message "Sertifika CurrentUser\Root'a eklendi: $cerFile"
+                $ok = $true
+                break
+            }
+        } catch {
+            $err = $_.Exception.Message
+            Write-SqlBridgeClientLog -Level WARN -Message ("Sertifika {0} basarisiz: {1}" -f $path, $err)
+        }
+    }
+    return [ordered]@{ success = $ok; cerPath = $cerFile; error = $err }
+}
+
 function Install-SqlBridgeClient {
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -301,6 +340,14 @@ function Install-SqlBridgeClient {
     }
     Save-SqlBridgeClientConfig -Config $cfg
     $hint = Write-SqlBridgeConnectionHint -Port $ListenPort -ServerHost $ServerHost
+
+    $certResult = $null
+    try {
+        $certResult = Install-SqlBridgeClientCertificate -ServerHost $ServerHost -ProbeApiPort $ProbeApiPort
+    } catch {
+        Write-SqlBridgeClientLog -Level WARN -Message "Sertifika kurulumu atladi: $($_.Exception.Message)"
+        $certResult = [ordered]@{ success = $false; error = $_.Exception.Message }
+    }
 
     $scriptPath = $PSCommandPath
     if (-not $scriptPath) { $scriptPath = $MyInvocation.MyCommand.Path }
@@ -332,6 +379,7 @@ function Install-SqlBridgeClient {
         connectionString = "Server=127.0.0.1,$ListenPort;Encrypt=False;"
         server           = $ServerHost
         probePort        = $ProbeApiPort
+        certificate      = $certResult
     }
 }
 

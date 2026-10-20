@@ -486,6 +486,17 @@ function Update-WizardDataFromStep2 {
     } elseif ($rbCa.Checked) {
         $script:WizardData.CertMode = 'CASigned'
     }
+    # SQL Bridge secildiyse sertifika + Caddy otomatik zorunlu
+    if ($script:WizardData.InstallSqlBridge) {
+        if ($script:WizardData.CertMode -ne 'CASigned') {
+            $script:WizardData.CertMode = 'SelfSigned'
+            $rbSelf.Checked = $true
+        }
+        $script:WizardData.InstallCaddySsl = $true
+        $chkCy.Checked = $true
+        $script:WizardData.InstallProbeApi = $true
+        $chkPa.Checked = $true
+    }
 }
 
 # -----------------------------------------------------------------------------
@@ -891,7 +902,10 @@ function New-InstallActions {
     if ($script:WizardData.InstallCloudflare){ [void]$actions.Add(@{ Name='Cloudflare Tunnel kuruluyor'; Script='CloudflareTunnelInstaller.ps1' }) }
     if ($script:WizardData.InstallProbeApi)   { [void]$actions.Add(@{ Name='Probe REST API kuruluyor (8444 + web portali)'; Script='Install-ProbeApiHost.ps1' }) }
     if ($script:WizardData.InstallCaddySsl)   { [void]$actions.Add(@{ Name='Caddy SSL kuruluyor (HTTPS 8445)'; Script='Install-CaddySsl.ps1' }) }
-    if ($script:WizardData.InstallSqlBridge)  { [void]$actions.Add(@{ Name='SQL Bridge etkinlestiriliyor (CONNECT /sql-bridge)'; Script='SqlBridge.ps1'; Args='Install' }) }
+    if ($script:WizardData.InstallSqlBridge)  {
+        # SqlBridge.ps1 Install icinde auto TLS + Caddy de cagrilir
+        [void]$actions.Add(@{ Name='SQL Bridge + otomatik TLS sertifikasi'; Script='SqlBridge.ps1'; Args='Install' })
+    }
     if ($script:WizardData.PublishApps -and $script:WizardData.SelectedApps.Count -gt 0) {
         [void]$actions.Add(@{ Name='RemoteApp koleksiyonu yayinlaniyor'; Script='RemoteAppPublisher.ps1' })
     }

@@ -337,8 +337,202 @@ function Remove-RdsCertificate {
     }
 }
 
-Export-ModuleMember -Function @(
-    'New-RdsCertificate',
-    'Get-RdsCertificate',
-    'Remove-RdsCertificate'
-)
+function Get-AutoTlsDnsNames {
+    <#
+    .SYNOPSIS
+        Self-signed SAN listesi: hostname, FQDN, LAN/public IP, localhost.
+    #>
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param([string[]]$ExtraNames)
+
+    $names = New-Object System.Collections.Generic.List[string]
+    foreach ($n in @('localhost', '127.0.0.1', $env:COMPUTERNAME)) {
+        if ($n -and -not $names.Contains($n)) { [void]$names.Add($n) }
+    }
+    try {
+        $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+        if ($cs.DNSHostName -and -not $names.Contains([string]$cs.DNSHostName)) {
+            [void]$names.Add([string]$cs.DNSHostName)
+        }
+        if ($cs.Domain -and $cs.Domain -ne 'WORKGROUP' -and $cs.DNSHostName) {
+            $fqdn = '{0}.{1}' -f $cs.DNSHostName, $cs.Domain
+            if (-not $names.Contains($fqdn)) { [void]$names.Add($fqdn) }
+        }
+    } catch { }
+
+    $cfgDir = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config'
+    foreach ($file in @('customers.json', 'client-endpoints.json')) {
+        $path = Join-Path $cfgDir $file
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        try {
+            $j = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($file -eq 'customers.json' -and $j.customers) {
+                foreach ($c in @($j.customers)) {
+                    foreach ($prop in @('publicIp', 'lanIp', 'vpnIp', 'hostname', 'fqdn')) {
+                        if ($c.PSObject.Properties[$prop] -and $c.$prop) {
+                            $v = [string]$c.$prop
+                            if ($v -and -not $names.Contains($v)) { [void]$names.Add($v) }
+                        }
+                    }
+                }
+            } else {
+                foreach ($prop in @('public', 'lan', 'vpn', 'client', 'hostname', 'fqdn')) {
+                    if ($j.PSObject.Properties[$prop] -and $j.$prop) {
+                        $v = [string]$j.$prop
+                        if ($v -and -not $names.Contains($v)) { [void]$names.Add($v) }
+                    }
+                }
+            }
+        } catch { }
+    }
+
+    if ($ExtraNames) {
+        foreach ($e in $ExtraNames) {
+            if ($e -and -not $names.Contains($e)) { [void]$names.Add($e) }
+        }
+    }
+    return @($names.ToArray())
+}
+
+function Install-AutoTlsCertificate {
+    <#
+    .SYNOPSIS
+        Gerekirse self-signed TLS sertifikasi olusturur, Root'a guvenir, .cer export eder, RDP'ye baglar.
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    [OutputType([pscustomobject])]
+    param(
+        [string[]]$DnsNames,
+        [ValidateRange(1, 30)]
+        [int]$YearsValid = 5,
+        [switch]$BindRdpTcp,
+        [switch]$ForceNew,
+        [string]$LogPath
+    )
+
+    if (-not $LogPath) {
+        $LogPath = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Logs\certificate-manager.log'
+    }
+    Set-CertificateLog -Path $LogPath
+    $script:CertLogPath = $LogPath
+
+    if (-not $DnsNames -or $DnsNames.Count -lt 1) {
+        $DnsNames = Get-AutoTlsDnsNames
+    } else {
+        $DnsNames = Get-AutoTlsDnsNames -ExtraNames $DnsNames
+    }
+    if ($DnsNames.Count -lt 1) { $DnsNames = @($env:COMPUTERNAME, 'localhost') }
+
+    $primary = $DnsNames[0]
+    $cfgDir = Join-Path $env:ProgramData 'RdpVirtualBoxApp\Config'
+    if (-not (Test-Path -LiteralPath $cfgDir)) {
+        New-Item -ItemType Directory -Path $cfgDir -Force | Out-Null
+    }
+    $cerSql = Join-Path $cfgDir 'EXFIN-SqlBridge.cer'
+    $cerGw  = Join-Path $cfgDir 'EXFIN-RD-Gateway.cer'
+    $metaPath = Join-Path $cfgDir 'auto-tls.json'
+
+    # Mevcut uygun sertifika var mi?
+    $existing = $null
+    if (-not $ForceNew -and (Test-Path -LiteralPath $metaPath)) {
+        try {
+            $meta = Get-Content -LiteralPath $metaPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($meta.thumbprint) {
+                $existing = Get-ChildItem -Path "Cert:\LocalMachine\My\$($meta.thumbprint)" -ErrorAction SilentlyContinue
+                if ($existing -and $existing.NotAfter -gt (Get-Date).AddDays(30)) {
+                    Write-CertificateLogEntry -Message "Reusing auto TLS cert $($existing.Thumbprint)"
+                } else { $existing = $null }
+            }
+        } catch { $existing = $null }
+    }
+
+    if (-not $existing) {
+        if ($PSCmdlet.ShouldProcess(($DnsNames -join ', '), 'Create auto self-signed TLS certificate')) {
+            Write-CertificateLogEntry -Message ("Creating auto TLS cert SAN=[{0}]" -f ($DnsNames -join ', '))
+            $existing = New-SelfSignedCertificate `
+                -DnsName $DnsNames `
+                -CertStoreLocation 'Cert:\LocalMachine\My' `
+                -NotAfter (Get-Date).AddYears($YearsValid) `
+                -KeyUsage DigitalSignature, KeyEncipherment `
+                -KeyAlgorithm RSA `
+                -KeyLength 2048 `
+                -FriendlyName ("RdpVirtualBoxApp AutoTLS ({0})" -f $primary) `
+                -ErrorAction Stop
+        } else {
+            return $null
+        }
+    }
+
+    $thumb = $existing.Thumbprint
+    Export-Certificate -Cert $existing -FilePath $cerSql -Force | Out-Null
+    Copy-Item -LiteralPath $cerSql -Destination $cerGw -Force
+    try {
+        Import-Certificate -FilePath $cerSql -CertStoreLocation 'Cert:\LocalMachine\Root' | Out-Null
+        Write-CertificateLogEntry -Message "Trusted auto TLS cert in LocalMachine\Root"
+    } catch {
+        Write-CertificateLogEntry -Level Warning -Message "Root trust failed: $($_.Exception.Message)"
+    }
+
+    if ($BindRdpTcp) {
+        try {
+            Set-RdpTcpCertificateBinding -CertificateThumbprint $thumb
+        } catch {
+            Write-CertificateLogEntry -Level Warning -Message "RDP bind skipped: $($_.Exception.Message)"
+        }
+    }
+
+    $metaObj = [ordered]@{
+        thumbprint = $thumb
+        subject    = [string]$existing.Subject
+        notAfter   = $existing.NotAfter.ToUniversalTime().ToString('o')
+        dnsNames   = @($DnsNames)
+        cerPath    = $cerSql
+        updatedAt  = (Get-Date).ToUniversalTime().ToString('o')
+    }
+    ($metaObj | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $metaPath -Encoding UTF8
+
+    return [pscustomobject]@{
+        Thumbprint        = $thumb
+        Subject           = $existing.Subject
+        NotAfter          = $existing.NotAfter
+        DnsNames          = @($DnsNames)
+        CerPath           = $cerSql
+        GatewayCerPath    = $cerGw
+        BoundToRdpTcp     = [bool]$BindRdpTcp
+        DownloadPath      = '/sql-bridge.cer'
+    }
+}
+
+# Script dogrudan calistirilirsa (sihirbaz: CertificateManager.ps1 SelfSigned)
+$isDirectCert = $MyInvocation.InvocationName -ne '.' -and
+                $MyInvocation.Line -notmatch '^\s*\.\s+' -and
+                $PSCommandPath -and
+                $MyInvocation.MyCommand.Path -and
+                ($MyInvocation.MyCommand.Path -eq $PSCommandPath)
+
+if ($isDirectCert -and $Mode) {
+    try {
+        if ($Mode -eq 'SelfSigned') {
+            $result = Install-AutoTlsCertificate -BindRdpTcp -DnsNames $(if ($ServerFqdn) { @($ServerFqdn) } else { @() })
+            $result | ConvertTo-Json -Depth 5
+        } elseif ($Mode -eq 'CA') {
+            if (-not $ServerFqdn) { $ServerFqdn = $env:COMPUTERNAME }
+            $result = New-RdsCertificate -Mode CA -PfxPath $PfxPath -PfxPassword $PfxPassword -BindRdpTcp:$BindRdpTcp
+            $result | Select-Object Thumbprint, Subject, NotAfter, BoundToRdpTcp | ConvertTo-Json -Depth 4
+        }
+    } catch {
+        Write-Error -ErrorRecord $_
+        exit 1
+    }
+}
+
+if ($MyInvocation.MyCommand.Path -and $MyInvocation.MyCommand.Path -like '*.psm1') {
+    Export-ModuleMember -Function @(
+        'New-RdsCertificate',
+        'Get-RdsCertificate',
+        'Remove-RdsCertificate',
+        'Get-AutoTlsDnsNames',
+        'Install-AutoTlsCertificate'
+    )
+}

@@ -44,6 +44,17 @@ Invoke-RestMethod http://127.0.0.1:8444/api/sql-bridge -Headers @{ Authorization
 
 SQL Server’da **TCP/IP protokolü açık** ve dinliyor olmalı (varsayılan 1433 veya dinamik port; kurulum registry’den algılar).
 
+### Otomatik sertifika
+
+`SqlBridge.ps1 -Mode Install` (veya sihirbazda SQL Bridge) şunları kendisi yapar:
+
+1. Self-signed TLS (SAN: sunucu adı, FQDN, public/LAN IP)
+2. `LocalMachine\Root`’a güven
+3. `EXFIN-SqlBridge.cer` + `EXFIN-RD-Gateway.cer` export (`/sql-bridge.cer` ile indirilebilir)
+4. Caddy HTTPS 8445 (yoksa kurar)
+
+İstemci kurulumu `/sql-bridge.cer` indirip `CurrentUser\Root`’a ekler — elle sertifika işlemi gerekmez.
+
 ## İstemci kurulumu
 
 Client sihirbazı adım 3’te:

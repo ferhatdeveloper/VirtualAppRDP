@@ -77,6 +77,9 @@ function Get-SqlBridgeDefaultConfig {
         allowDirectLan  = $false
         preferPublicIp  = $true
         probePort       = 8444
+        httpsPort       = 8445
+        certificateThumbprint = ''
+        certificateCer  = ''
         description     = 'Probe API CONNECT /sql-bridge -> yerel SQL. Public IP uzerinden 8444; SQL 1433 internete acilmaz.'
         updatedAt       = (Get-Date).ToUniversalTime().ToString('o')
     }
@@ -394,7 +397,13 @@ function Get-SqlBridgeStatus {
         discovery        = $discovery
         configPath       = (Get-SqlBridgeConfigPath)
         updatedAt        = [string]$cfg.updatedAt
-        note             = 'SQL TCP (1433) internete acilmaz. Public IP yalnizca Probe API (8444) tüneli icindir.'
+        certificate = [ordered]@{
+            thumbprint   = $(if ($cfg['certificateThumbprint']) { [string]$cfg['certificateThumbprint'] } else { $null })
+            downloadPath = '/sql-bridge.cer'
+            httpsPort    = $(if ($cfg['httpsPort']) { [int]$cfg['httpsPort'] } else { 8445 })
+            autoCreated  = $true
+        }
+        note             = 'SQL TCP (1433) internete acilmaz. Sertifika otomatik; istemci /sql-bridge.cer indirip guvenir. Tünel Probe 8444 / HTTPS 8445.'
     }
 }
 
@@ -435,6 +444,36 @@ function Install-SqlBridge {
         Write-SqlBridgeLog -Message ("Public IP bulundu; istemci tüneli bu adrese yonlendirilecek: {0}:{1}" -f $eps.publicIp, $cfg.probePort)
     } else {
         Write-SqlBridgeLog -Level WARN -Message 'Public IP kaydi yok (customers.json / client-endpoints.json). Istemci sihirbazindaki sunucu IP kullanilir.'
+    }
+
+    # Sertifika: yoksa otomatik self-signed (sunucu adi + public IP SAN) + Root trust + .cer export
+    $certInfo = $null
+    try {
+        $certScript = Join-Path $PSScriptRoot 'CertificateManager.ps1'
+        if (Test-Path -LiteralPath $certScript) {
+            . $certScript
+            if (Get-Command -Name 'Install-AutoTlsCertificate' -ErrorAction SilentlyContinue) {
+                $san = @($eps.acceptHosts)
+                $certInfo = Install-AutoTlsCertificate -DnsNames $san -BindRdpTcp
+                $cfg.certificateThumbprint = [string]$certInfo.Thumbprint
+                $cfg.certificateCer = [string]$certInfo.CerPath
+                Write-SqlBridgeLog -Message ("Auto TLS cert: {0} cer={1}" -f $certInfo.Thumbprint, $certInfo.CerPath)
+            }
+        }
+    } catch {
+        Write-SqlBridgeLog -Level WARN -Message "Auto TLS sertifika atladi: $($_.Exception.Message)"
+    }
+
+    # Caddy HTTPS 8445 (Probe reverse proxy) — yoksa kur
+    try {
+        $caddyScript = Join-Path $PSScriptRoot 'Install-CaddySsl.ps1'
+        if (Test-Path -LiteralPath $caddyScript) {
+            Write-SqlBridgeLog -Message 'Caddy SSL (HTTPS 8445) kuruluyor / dogrulaniyor...'
+            & $caddyScript 2>&1 | ForEach-Object { Write-SqlBridgeLog -Message ("Caddy: {0}" -f $_) }
+            $cfg.httpsPort = 8445
+        }
+    } catch {
+        Write-SqlBridgeLog -Level WARN -Message "Caddy SSL atladi: $($_.Exception.Message)"
     }
 
     # SQL TCP etkinlestirme (opsiyonel): yalnizca registry bayragi; SQL restart istemezsek
